@@ -2,11 +2,11 @@ package sql
 
 const (
 	// Commands
-	CreateDatabase = 1
-	DropDatabase   = 2
+	SQLCreateDatabase = 1
+	SQLDropDatabase   = 2
 
-	CreateTable = 3
-	DropTable   = 4
+	SQLCreateTable = 3
+	SQLDropTable   = 4
 
 	SQLInsert = 5
 	SQLSelect = 6

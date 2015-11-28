@@ -3,12 +3,22 @@ package main
 import (
 	"fmt"
 	"github.com/tomdionysus/trinity/schema"
+	"github.com/tomdionysus/trinity/server"
 	"github.com/tomdionysus/trinity/sql"
+	"os"
 )
 
 func main() {
 
 	fmt.Printf("Trinity v%s\n", VERSION)
+
+	x := server.NewTLSServer()
+	err := x.LoadPEMCert("domain.crt", "domain.key")
+	if err != nil {
+		fmt.Printf("Cannot Load Certs: %s\n", err.Error())
+	}
+
+	os.Exit(0)
 
 	db := schema.NewDatabase("geodb")
 

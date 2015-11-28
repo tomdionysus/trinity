@@ -1,2 +1,4 @@
 .DS_Store
-trinity
+build
+*.crt
+*.key
