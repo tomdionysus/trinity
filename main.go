@@ -1,55 +1,79 @@
 package main
 
 import (
-	"fmt"
-	"github.com/tomdionysus/trinity/schema"
+	// "github.com/tomdionysus/trinity/schema"
 	"github.com/tomdionysus/trinity/server"
-	"github.com/tomdionysus/trinity/sql"
+	// "github.com/tomdionysus/trinity/sql"
+	"github.com/tomdionysus/trinity/util"
+	"github.com/tomdionysus/trinity/config"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
 
-	fmt.Printf("Trinity v%s\n", VERSION)
+	// Load Configuration
+	config := config.NewConfig()
 
-	x := server.NewTLSServer()
-	err := x.LoadPEMCert("domain.crt", "domain.key")
+	// Start logging
+	logger := util.NewLogger(*config.LogLevel)
+
+	// Validate Configuration
+	if i, errs := config.Validate(); !i {
+		for _, err := range errs {
+			logger.Error("Config", err.Error())
+		}
+		os.Exit(-1)
+		logger.Fatal("Main", "Bad Configuration, Exiting")
+	}
+
+	// Banner
+	logger.Info("Main", "---------------------------------------")
+	logger.Info("Main", "Trinity DB - v%s", VERSION)
+	logger.Info("Main", "---------------------------------------")
+
+	// Config Debug
+	logger.Debug("Config","Nodes: %s", config.Nodes.String())
+	logger.Debug("Config","Certificate: %s", *config.Certificate)
+	logger.Debug("Config","Port: %d", *config.Port)
+	logger.Debug("Config","LogLevel: %s (%d)", *config.LogLevel, logger.LogLevel)
+
+	// Server
+	svr := server.NewTLSServer(logger)
+
+	// Certificate
+	err := svr.LoadPEMCert(*config.Certificate, *config.Certificate)
 	if err != nil {
-		fmt.Printf("Cannot Load Certs: %s\n", err.Error())
+		logger.Error("Main", "Cannot Load Certificate '%s': %s", *config.Certificate, err.Error())
+		os.Exit(-1)
+	}
+	logger.Debug("Main", "Cert Loaded")	
+
+	// Listen
+	err = svr.Listen(uint16(*config.Port))
+	if err != nil {
+		logger.Error("Main", "Cannot Start Server: %s", err.Error())
+		os.Exit(-1)
 	}
 
-	os.Exit(0)
+	c := make(chan os.Signal, 1)
+  signal.Notify(c, os.Interrupt)
+  signal.Notify(c, syscall.SIGTERM)
 
-	db := schema.NewDatabase("geodb")
+  for {
+  	select {
+  		case <-c:
+  			logger.Info("Main", "SIGINT recieved, shutting down")
+  			goto end
+  	}
+  }
 
-	nameField := &schema.Field{Name: "name", SQLType: schema.SQLVarChar, Length: 32, Nullable: false}
-	countryField := &schema.Field{Name: "country", SQLType: schema.SQLChar, Length: 2, Nullable: false}
-	populationField := &schema.Field{Name: "country", SQLType: schema.SQLChar, Length: 2, Nullable: false}
+  end:
 
-	cities := schema.NewTable("cities")
-	cities.AddField(nameField)
-	cities.AddField(countryField)
-	cities.AddField(populationField)
+  svr.Stop()
+  _ = <-svr.StatusChannel
 
-	db.AddTable(cities)
-
-	results := []sql.Term{}
-	results = append(results, &sql.Star{})
-
-	sources := []sql.Term{}
-	sources = append(sources, &sql.TableReference{Table: cities})
-
-	logicalAnd := &sql.Comparison{
-		A:         &sql.Comparison{A: sql.NewFieldReference(countryField, cities, nil), B: sql.NewConstant(schema.SQLVarChar, "NZ"), Operation: sql.OperationEQ},
-		B:         &sql.Comparison{A: sql.NewFieldReference(populationField, cities, nil), B: sql.NewConstant(schema.SQLInt, "500000"), Operation: sql.OperationLT},
-		Operation: sql.OperationAND,
-	}
-
-	test := sql.Select{
-		Results: results,
-		Sources: sources,
-		Where:   logicalAnd,
-	}
-
-	fmt.Printf(test.ToSQL(false) + "\n")
+  logger.Info("Main", "Shutdown Complete, exiting")
+  os.Exit(0)
 }
