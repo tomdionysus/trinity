@@ -10,6 +10,7 @@ type NodeURLs []string
 
 type Config struct {
   Nodes NodeURLs
+  CA *string
   Certificate *string
   Port *int
   LogLevel *string
@@ -28,6 +29,7 @@ func NewConfig() *Config {
   inst := &Config{}
   flag.Var(&inst.Nodes, "node", "URL of another trinity node")
   inst.Certificate = flag.String("cert", "", "Certificate PEM file")
+  inst.CA = flag.String("ca", "", "CA PEM file")
   inst.LogLevel = flag.String("loglevel", "error", "Logging Level [error,warn,info,debug]")
   inst.Port = flag.Int("port", 13531, "Cluster port")
   flag.Parse()

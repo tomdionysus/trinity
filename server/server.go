@@ -7,7 +7,8 @@ import (
 	"net"
 	"github.com/tomdionysus/trinity/util"
 	"fmt"
-
+	"io/ioutil"
+	"errors"
 )
 
 const (
@@ -20,10 +21,13 @@ type Client struct {
 }
 
 type TLSServer struct {
+	CACertificate *tls.Certificate
 	Certificate *tls.Certificate
 	Logger *util.Logger
 	ControlChannel chan(int)
 	StatusChannel chan(int)
+
+	CAPool *x509.CertPool
 
 	SessionCache tls.ClientSessionCache
 	Connections map[string]Client
@@ -38,6 +42,7 @@ func NewTLSServer(logger *util.Logger) *TLSServer {
 		StatusChannel: make(chan(int)),
 		Connections: map[string]Client{},
 		SessionCache: tls.NewLRUClientSessionCache(64),
+		CAPool: x509.NewCertPool(),
 	}
 }
 
@@ -53,11 +58,29 @@ func (me *TLSServer) LoadPEMCert(certFile string, keyFile string) error {
 	return err
 }
 
+func (me *TLSServer) LoadPEMCA(certFile string) error {
+	cabytes, err := ioutil.ReadFile(certFile)
+	if err != nil {
+		me.Logger.Error("Server","Cannot Load CA File '%s': %s", certFile, err.Error())
+		return err
+	}
+
+	if !me.CAPool.AppendCertsFromPEM(cabytes) {
+		me.Logger.Error("Server","Cannot Parse PEM CA File '%s'", certFile)
+		return errors.New("Cannot Parse CA File")
+	}
+
+	return nil
+}
+
 func (me *TLSServer) Listen(port uint16) error {
 	config := tls.Config{
+		ClientCAs: me.CAPool,
+		InsecureSkipVerify: true,
 		ClientSessionCache: me.SessionCache,
-		ClientAuth: tls.RequireAnyClientCert,
+		ClientAuth: tls.RequireAndVerifyClientCert,
 		Certificates: []tls.Certificate{*me.Certificate},
+		CipherSuites: []uint16{ 0x0035, 0xc030, 0xc02c },
 	}
 
 	config.Rand = rand.Reader
@@ -77,13 +100,20 @@ func (me *TLSServer) Listen(port uint16) error {
 
 func (me *TLSServer) ConnectTo(url string) {
 	conn, err := tls.Dial("tcp", url, &tls.Config{
+		RootCAs: me.CAPool,
+		InsecureSkipVerify: true,
 		Certificates: []tls.Certificate{*me.Certificate},
 	})
 	if err != nil {
-		me.Logger.Error("Server","Cannot connect to %s",url)
+		me.Logger.Error("Server","Cannot connect to %s: %s", url, err.Error())
 		return
 	}
-	me.Logger.Info("Server","Connected To %s (%s)", url, conn.RemoteAddr())
+	if !conn.ConnectionState().HandshakeComplete {
+		me.Logger.Error("Server","Cannot connect to %s: Handshake Not Complete", url)
+		conn.Close()
+		return
+	}
+	me.Logger.Info("Server","Connected To %s (%s) [%s]", url, conn.RemoteAddr().String(), Ciphers[conn.ConnectionState().CipherSuite])
 }
 
 func (me *TLSServer) Stop() {
@@ -128,7 +158,6 @@ func (me *TLSServer) server_loop() {
 }
 
 func (me *TLSServer) handle_client(client *Client) {
-	me.Logger.Info("Server","Connection accepted from %s", client.Connection.RemoteAddr())
 	tlscon, ok := client.Connection.(*tls.Conn)
 	if !ok {
 		me.Logger.Error("Server","Cannot Cast Connection to TLS Connection")
@@ -147,6 +176,25 @@ func (me *TLSServer) handle_client(client *Client) {
 		tlscon.Close()
 		return
 	}
-	sub := state.PeerCertificates[0].Subject
-	me.Logger.Info("Server","Connection Subject %s",sub)
+	sub := state.PeerCertificates[0].Subject.CommonName
+	me.Logger.Info("Server","Connection Accepted from %s (%s) [%s]",client.Connection.RemoteAddr(), sub, Ciphers[tlscon.ConnectionState().CipherSuite])
 }
+
+var Ciphers map[uint16]string = map[uint16]string{
+	0x0005: "TLS_RSA_WITH_RC4_128_SHA",
+	0x000a: "TLS_RSA_WITH_3DES_EDE_CBC_SHA",
+	0x002f: "TLS_RSA_WITH_AES_128_CBC_SHA",
+	0x0035: "TLS_RSA_WITH_AES_256_CBC_SHA",
+	0xc007: "TLS_ECDHE_ECDSA_WITH_RC4_128_SHA",
+	0xc009: "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA",
+	0xc00a: "TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA",
+	0xc011: "TLS_ECDHE_RSA_WITH_RC4_128_SHA",
+	0xc012: "TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA",
+	0xc013: "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA",
+	0xc014: "TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA",
+	0xc02f: "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+	0xc02b: "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+	0xc030: "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+	0xc02c: "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
+}
+

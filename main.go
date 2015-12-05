@@ -42,8 +42,16 @@ func main() {
 	// Server
 	svr := server.NewTLSServer(logger)
 
+	// CA
+	err := svr.LoadPEMCA(*config.CA)
+	if err != nil {
+		logger.Error("Main", "Cannot Load CA '%s': %s", *config.CA, err.Error())
+		os.Exit(-1)
+	}
+	logger.Debug("Main", "CA Certiticate Loaded")	
+	
 	// Certificate
-	err := svr.LoadPEMCert(*config.Certificate, *config.Certificate)
+	err = svr.LoadPEMCert(*config.Certificate, *config.Certificate)
 	if err != nil {
 		logger.Error("Main", "Cannot Load Certificate '%s': %s", *config.Certificate, err.Error())
 		os.Exit(-1)
