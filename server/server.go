@@ -76,7 +76,6 @@ func (me *TLSServer) LoadPEMCA(certFile string) error {
 func (me *TLSServer) Listen(port uint16) error {
 	config := tls.Config{
 		ClientCAs: me.CAPool,
-		InsecureSkipVerify: true,
 		ClientSessionCache: me.SessionCache,
 		ClientAuth: tls.RequireAndVerifyClientCert,
 		Certificates: []tls.Certificate{*me.Certificate},
@@ -101,7 +100,6 @@ func (me *TLSServer) Listen(port uint16) error {
 func (me *TLSServer) ConnectTo(url string) {
 	conn, err := tls.Dial("tcp", url, &tls.Config{
 		RootCAs: me.CAPool,
-		InsecureSkipVerify: true,
 		Certificates: []tls.Certificate{*me.Certificate},
 	})
 	if err != nil {
