@@ -4,15 +4,19 @@ import(
   "fmt"
   "strings"
   "time"
+  "sync"
 )
 
 type Logger struct {
 	LogLevel uint
+
+  mutex *sync.Mutex
 }
 
 func NewLogger(logLevel string) *Logger {
   logger := &Logger{
     LogLevel: parseLogLevel(strings.ToLower(strings.Trim(logLevel," "))),
+    mutex: &sync.Mutex{},
   }
   if logger.LogLevel == 0 {
     logger.Warn("Logger", "Cannot parse log level '%s', assuming debug", logLevel)
@@ -21,35 +25,38 @@ func NewLogger(logLevel string) *Logger {
 }
 
 func (me *Logger) Fatal(component string, message string, args... interface{}) {
-  printLog(component,"FATAL",message, args...)
+  me.printLog(component,"FATAL",message, args...)
 }
 
 func (me *Logger) Error(component string, message string, args... interface{}) {
-  printLog(component,"ERROR",message, args...)
+  me.printLog(component,"ERROR",message, args...)
 }
 
 func (me *Logger) Warn(component string, message string, args... interface{}) {
   if me.LogLevel > 3 { return }
-  printLog(component,"WARN ",message, args...)
+  me.printLog(component,"WARN ",message, args...)
 }
 
 func (me *Logger) Info(component string, message string, args... interface{}) {
   if me.LogLevel > 2 { return }
-  printLog(component,"INFO ",message, args...)
+  me.printLog(component,"INFO ",message, args...)
 }
 
 func (me *Logger) Debug(component string, message string, args... interface{}) {
   if me.LogLevel > 1 { return }
-  printLog(component,"DEBUG",message, args...)
+  me.printLog(component,"DEBUG",message, args...)
 }
 
-func printLog(component string, level string, message string, args... interface{}) {
-  fmt.Printf("%s [%s] %s: ",getTimeUTCString(), level, component)
+func (me *Logger) printLog(component string, level string, message string, args... interface{}) {
+  me.mutex.Lock()
+  defer me.mutex.Unlock()
+
+  fmt.Printf("%s [%s] %s: ",me.getTimeUTCString(), level, component)
   fmt.Printf(message, args...)
   fmt.Print("\n")
 }
 
-func getTimeUTCString() string {
+func (me *Logger) getTimeUTCString() string {
   return time.Now().UTC().Format(time.RFC3339)
 }
 
