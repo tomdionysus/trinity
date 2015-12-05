@@ -108,12 +108,19 @@ func (me *TLSServer) ConnectTo(url string) {
 		me.Logger.Error("Server","Cannot connect to %s: %s", url, err.Error())
 		return
 	}
-	if !conn.ConnectionState().HandshakeComplete {
+	state := conn.ConnectionState()
+	if len(state.PeerCertificates)==0 {
+		me.Logger.Error("Server","Cannot connect to %s: Peer has no certificates", url)
+		conn.Close()
+		return
+	}
+	if !state.HandshakeComplete {
 		me.Logger.Error("Server","Cannot connect to %s: Handshake Not Complete", url)
 		conn.Close()
 		return
 	}
-	me.Logger.Info("Server","Connected To %s (%s) [%s]", url, conn.RemoteAddr().String(), Ciphers[conn.ConnectionState().CipherSuite])
+	sub := state.PeerCertificates[0].Subject.CommonName
+	me.Logger.Info("Server","Connected To %s (%s) [%s]", conn.RemoteAddr(), sub, Ciphers[state.CipherSuite])
 }
 
 func (me *TLSServer) Stop() {
