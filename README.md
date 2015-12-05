@@ -6,25 +6,30 @@ Trinity is a concept project for a relational database, designed from the ground
 
 ## Design goals
 
-* Inherently multi master - connect to any node
+* Distributed Architecture - no masters/replicas/slaves, read/write to any node
+* ANSI SQL92 compatible
+* Built-in fast, distrubuted Key-Value Store
 * Automatic replication and sharding
-* Optional Direct block level access, no filesystem
-* Multiple-mode consistency (fire-and-forget, eventual, full)
-* Soft clusters, add/remove nodes at any time
-* Zero configuration
+* Distributed Queries 
+* Multi-mode consistency - per write, choose fire-and-forget, eventual, full
+* Soft clusters - add/remove nodes at any time
 * Capacity scales by adding nodes
-* ANSI SQL compatible
+* Optional Direct block level access, no filesystem
+* All connections encrypted with TLS
+* Zero configuration
 
 ## Language
 
 Trinity is written in [Golang](https://golang.org).
 
-## Constraints on SQL
-
-* Tables must have an 8-byte random primary key.
-
 ## Progress
+
+* Command Line flags
+* TLS Layer Prototype
 
 ## TODO
 
-* 
+* GOB streaming between servers
+* Integrate consistenthash
+* Disk-based key/value store 
+* Expose Key/value store
