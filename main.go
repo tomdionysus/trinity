@@ -57,10 +57,18 @@ func main() {
 		os.Exit(-1)
 	}
 
+	// Notify SIGINT, SIGTERM
 	c := make(chan os.Signal, 1)
   signal.Notify(c, os.Interrupt)
   signal.Notify(c, syscall.SIGTERM)
 
+  if len(config.Nodes)>0 {
+  	for _, url := range config.Nodes {
+  		svr.ConnectTo(url)
+  	}
+	}
+
+	// Wait for SIGINT
   for {
   	select {
   		case <-c:
@@ -71,6 +79,7 @@ func main() {
 
   end:
 
+  // Shutdown Server and wait for close
   svr.Stop()
   _ = <-svr.StatusChannel
 
