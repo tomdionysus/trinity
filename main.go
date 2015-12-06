@@ -2,8 +2,8 @@ package main
 
 import (
 	// "github.com/tomdionysus/trinity/schema"
-	"github.com/tomdionysus/trinity/server"
 	// "github.com/tomdionysus/trinity/sql"
+  "github.com/tomdionysus/trinity/network"
 	"github.com/tomdionysus/trinity/util"
 	"github.com/tomdionysus/trinity/config"
 	"os"
@@ -39,17 +39,19 @@ func main() {
 	logger.Debug("Config","Port: %d", *config.Port)
 	logger.Debug("Config","LogLevel: %s (%d)", *config.LogLevel, logger.LogLevel)
 
-	// Server
-	svr := server.NewTLSServer(logger)
 
-	// CA
-	err := svr.LoadPEMCA(*config.CA)
-	if err != nil {
-		logger.Error("Main", "Cannot Load CA '%s': %s", *config.CA, err.Error())
-		os.Exit(-1)
-	}
-	logger.Debug("Main", "CA Certiticate Loaded")	
-	
+  // CA
+  capool := network.NewCAPool(logger)
+  err := capool.LoadPEM(*config.CA)
+  if err != nil {
+    logger.Error("Main", "Cannot Load CA '%s': %s", *config.CA, err.Error())
+    os.Exit(-1)
+  }
+  logger.Debug("Main", "CA Certiticate Loaded") 
+
+	// Server
+	svr := network.NewTLSServer(logger, capool)
+  
 	// Certificate
 	err = svr.LoadPEMCert(*config.Certificate, *config.Certificate)
 	if err != nil {
@@ -70,9 +72,14 @@ func main() {
   signal.Notify(c, os.Interrupt)
   signal.Notify(c, syscall.SIGTERM)
 
+  // TEST: Connect to other nodes
   if len(config.Nodes)>0 {
   	for _, url := range config.Nodes {
-  		svr.ConnectTo(url)
+      client := network.NewPeer(logger, svr, url)
+  		err := client.Connect()
+      if err == nil {
+        client.Start()
+      }
   	}
 	}
 

@@ -29,7 +29,9 @@ Trinity is written in [Golang](https://golang.org).
 
 ## TODO
 
+* Autoconnect to all available nodes
 * GOB streaming between servers
+* Proxying GOBs, Data
 * Integrate consistenthash
 * Disk-based key/value store 
 * Expose Key/value store
