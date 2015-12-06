@@ -7,6 +7,7 @@ import (
   "errors"
   // "bytes"
   "encoding/gob"
+  "time"
 )
 
 const (
@@ -14,6 +15,7 @@ const (
   PeerStateConnecting = iota
   PeerStateHandshake = iota
   PeerStateConnected = iota
+  PeerStateDefib = iota
 )
 
 type Peer struct {
@@ -24,9 +26,12 @@ type Peer struct {
   State uint
 
   Connection *tls.Conn
+  HeartbeatTicker *time.Ticker
 
   Writer *gob.Encoder
   Reader *gob.Decoder
+
+  LastHeartbeat time.Time
 }
 
 func NewPeer(logger *util.Logger, server *TLSServer, address string) *Peer {
@@ -35,6 +40,7 @@ func NewPeer(logger *util.Logger, server *TLSServer, address string) *Peer {
     Address: address,
     State: PeerStateDisconnected,
     Server: server,
+    LastHeartbeat: time.Now(),
   }
   return inst
 }
@@ -72,6 +78,7 @@ func (me *Peer) Connect() error {
 func (me *Peer) Disconnect() {
   me.State = PeerStateDisconnected
   me.Connection.Close()
+  me.HeartbeatTicker.Stop()
   me.Logger.Info("Peer", "Disconnected: %s", me.Connection.RemoteAddr())
 }
 
@@ -99,9 +106,43 @@ func (me *Peer) Start() error {
   me.Reader = gob.NewDecoder(me.Connection)
   me.Writer = gob.NewEncoder(me.Connection)
 
+  go me.heartbeat()
   go me.process()
 
   return nil
+}
+
+// Ping the Peer every second.
+func (me *Peer) heartbeat() {
+  me.HeartbeatTicker = time.NewTicker(time.Second)
+
+  for {
+    <- me.HeartbeatTicker.C
+
+    // Check For Defib
+    if time.Now().After(me.LastHeartbeat.Add(5 * time.Second)) {
+      me.Logger.Warn("Peer", "%s: Peer in Defib (no response for 5 seconds)", me.Connection.RemoteAddr())
+      me.State = PeerStateDefib
+    }
+
+    switch me.State {
+      case PeerStateConnected:
+        err := me.SendPacket(packets.NewPacket(packets.CMD_HEARTBEAT,nil))
+        if err!=nil {
+          me.Logger.Error("Peer","Error Sending Heartbeat, disconnecting", me.Connection.RemoteAddr())
+          me.Disconnect()
+          return
+        }
+      case PeerStateDefib:
+        if time.Now().After(me.LastHeartbeat.Add(10 * time.Second)) {
+          me.Logger.Warn("Peer", "%s: Peer DOA (Defib for 5 seconds, disconnecting)", me.Connection.RemoteAddr())
+          me.Disconnect()
+          return
+        }
+    }
+
+  }
+
 }
 
 func (me *Peer) process() {
@@ -112,20 +153,17 @@ func (me *Peer) process() {
     // Read Command
     err := me.Reader.Decode(&packet)
     if err!=nil {
-      if err.Error()=="EOF" {
-        // Disconnected.
-        goto end
-      }
-      me.Logger.Error("Peer", "Error Reading: %s", err.Error())
+      me.Logger.Error("Peer", "%s: Error Reading: %s", me.Connection.RemoteAddr(), err.Error())
       goto end
     }
     switch (packet.Command) {
       case packets.CMD_HEARTBEAT:
-        me.Logger.Debug("Peer", "Got CMD_HEARTBEAT", packet.Command)
+        // me.Logger.Debug("Peer", "%s: CMD_HEARTBEAT", me.Connection.RemoteAddr())
+        me.LastHeartbeat = time.Now()
       case packets.CMD_DISTRIBUTION:
-        me.Logger.Debug("Peer", "Got CMD_DISTRIBUTION: %s", packet.Payload)
+        me.Logger.Debug("Peer", "%s: CMD_DISTRIBUTION: %s", me.Connection.RemoteAddr(), packet.Payload)
       default:
-        me.Logger.Warn("Peer", "Got Unknown Packet Command %d", packet.Command)
+        me.Logger.Warn("Peer", "%s: Unknown Packet Command %d", me.Connection.RemoteAddr(), packet.Command)
     }
   }
   end:

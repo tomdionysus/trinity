@@ -27,10 +27,11 @@ Trinity is written in [Golang](https://golang.org).
 * Command Line flags
 * TLS Layer Prototype
 * GOB streaming between servers
+* Heartbeats
 
 ## TODO
 
-* Heartbeats
+* Peer Swapping
 * Autoconnect to all available nodes
 * Proxying GOBs, Data
 * Integrate consistenthash
