@@ -4,6 +4,10 @@
 
 Trinity is a concept project for a relational database, designed from the ground up as a cloud system.
 
+## Status
+
+Trinity is pre-alpha - 'concept project'. Don't even think about using this even in development - yet.
+
 ## Design goals
 
 * Distributed Architecture - no masters/replicas/slaves, read/write to any node
