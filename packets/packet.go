@@ -3,42 +3,39 @@ package packets
 import (
   "time"
   "math/rand"
+  // "encoding/gob"
 )
 
 const(
   PacketIDSize = 8
+
+  CMD_HEARTBEAT = 1
+  CMD_DISTRIBUTION = 2
 )
 
-type Packet interface {
-  GetCommand() uint16
-  GetID() [PacketIDSize]byte
-  GetSent() time.Time
-}
-
-type BasePacket struct {
+type Packet struct {
   Command uint16
   ID [PacketIDSize]byte
   Sent time.Time
+
+  Payload interface{}
 }
 
-func (me *BasePacket) GetCommand() uint16 {
-  return me.Command
-}
-
-func (me *BasePacket) GetID() [PacketIDSize]byte {
-  return me.ID
-}
-
-func (me *BasePacket) GetSent() time.Time {
-  return me.Sent
+func NewPacket(command uint16, payload interface{}) *Packet {
+  inst := &Packet{
+    Command: command,
+    ID: GetRandomID(),
+    Sent: time.Now(),
+    Payload: payload,
+  }
+  return inst
 }
 
 func GetRandomID() [PacketIDSize]byte {
   rand.Seed(time.Now().UTC().UnixNano())
-  b := []byte{}
-  for i:=0; i<size; i++ {
-    b = append(b, byte(rand.Intn(256)))
+  b := [PacketIDSize]byte{}
+  for i:=0; i<PacketIDSize; i++ {
+    b[i] = byte(rand.Intn(256))
   }
-  x := bt.ByteSliceKey(b[:])
-  return &x
+  return b
 }

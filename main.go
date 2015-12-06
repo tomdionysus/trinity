@@ -5,7 +5,8 @@ import (
 	// "github.com/tomdionysus/trinity/sql"
   "github.com/tomdionysus/trinity/network"
 	"github.com/tomdionysus/trinity/util"
-	"github.com/tomdionysus/trinity/config"
+  "github.com/tomdionysus/trinity/config"
+	"github.com/tomdionysus/trinity/packets"
 	"os"
 	"os/signal"
 	"syscall"
@@ -79,6 +80,9 @@ func main() {
   		err := client.Connect()
       if err == nil {
         client.Start()
+
+        packet := packets.NewPacket(packets.CMD_DISTRIBUTION, "TestDistrib!")
+        client.SendPacket(packet)
       }
   	}
 	}
