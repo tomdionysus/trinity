@@ -112,6 +112,10 @@ func (me *Peer) process() {
     // Read Command
     err := me.Reader.Decode(&packet)
     if err!=nil {
+      if err.Error()=="EOF" {
+        // Disconnected.
+        goto end
+      }
       me.Logger.Error("Peer", "Error Reading: %s", err.Error())
       goto end
     }
