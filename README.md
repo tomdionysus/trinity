@@ -8,36 +8,34 @@ Trinity is a concept project for a relational database, designed from the ground
 
 Trinity is pre-alpha - 'concept project'. Don't even think about using this even in development - yet.
 
-## Design goals
+* [Design Goals](docs/design-goals.md)
+* [Progress](docs/progress.md)
 
-* Distributed Architecture - no masters/replicas/slaves, read/write to any node
-* ANSI SQL92 compatible
-* Built-in fast, distrubuted Key-Value Store
-* Automatic replication and sharding
-* Distributed Queries 
-* Multi-mode consistency - per write, choose fire-and-forget, eventual, full
-* Soft clusters - add/remove nodes at any time
-* Capacity scales by adding nodes
-* Optional Direct block level access, no filesystem
-* All connections encrypted with TLS
-* Zero configuration
+## Building
 
-## Language
+Clone the repo, and use the `bin/make` script:
 
-Trinity is written in [Golang](https://golang.org).
+```bash
+git clone git@github.com:tomdionysus/trinity.git
+cd trinity
+bin/make
+```
 
-## Progress
+Trinity compiles to a single binary, `build/trinity-server`.
 
-* Command Line flags
-* TLS Layer Prototype
-* GOB streaming between servers
-* Heartbeats
+## Usage
 
-## TODO
+```bash
+trinity-server --ca=<CA_PEM> --cert=<CERT_PEM> [flags]
+```
 
-* Peer Swapping
-* Autoconnect to all available nodes
-* Proxying GOBs, Data
-* Integrate consistenthash
-* Disk-based key/value store 
-* Expose Key/value store
+| Flag                | Description                                       |
+|:--------------------|:--------------------------------------------------|
+| --help              | Display command line flags help                   |
+| -ca, --ca           | Specify the Certificate Authority PEM file        |
+| -cert, --cert       | Specify the Certificate PEM file                  |
+| -ca, --ca           | Specify the Certificate PEM file                  |
+
+## References
+
+* [Golang](https://golang.org)
