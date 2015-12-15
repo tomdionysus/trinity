@@ -29,12 +29,15 @@ Trinity compiles to a single binary, `build/trinity-server`.
 trinity-server --ca=<CA_PEM> --cert=<CERT_PEM> [flags]
 ```
 
-| Flag                | Description                                       |
-|:--------------------|:--------------------------------------------------|
-| --help              | Display command line flags help                   |
-| -ca, --ca           | Specify the Certificate Authority PEM file        |
-| -cert, --cert       | Specify the Certificate PEM file                  |
-| -ca, --ca           | Specify the Certificate PEM file                  |
+| Flag                  | Default        | Description                                       |
+|:----------------------|----------------|:--------------------------------------------------|
+| -help                 | n/a            | Display command line flags help                   |
+| -ca             		| ca.pem         | Specify the Certificate Authority PEM file        |
+| -cert         		| cert.pem       | Specify the Certificate PEM file                  |
+| -loglevel  			| error          | Set the logging level [debug,info,warn,error]     |
+| -memcache             | false          | Enable the Memcache interface                     |
+| -memcacheport         | 11211          | Set the port for memcache, default 11211          |
+
 
 ## References
 
