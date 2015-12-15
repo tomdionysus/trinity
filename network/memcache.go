@@ -8,6 +8,7 @@ import (
   "bufio"
   "strings"
   "strconv"
+  "time"
 )
 
 type MemcacheServer struct {
@@ -125,7 +126,7 @@ func (me *MemcacheServer) handleCommand(addr string, reader *bufio.Reader, write
 }
 
 func (me *MemcacheServer) handleSet(addr string, reader *bufio.Reader, writer *bufio.Writer, args []string) {
-  if len(args)>6 {
+  if len(args)>6 || len(args)<5 {
     writer.WriteString("ERROR\r\n"); writer.Flush()
     return
   }
@@ -137,18 +138,20 @@ func (me *MemcacheServer) handleSet(addr string, reader *bufio.Reader, writer *b
 
   me.Logger.Debug("Memcache", "[%s] -> Set %s", addr, args)
 
-  bytes, err := strconv.Atoi(args[4])
-  if err!=nil {
-    writer.WriteString("SERVER_ERROR\r\n"); writer.Flush()
-    return
-  }
+  _, err := strconv.Atoi(args[4])
+  if err!=nil { writer.WriteString("SERVER_ERROR\r\n"); writer.Flush(); return }
+
+  expirytime, err := strconv.Atoi(args[3])
+  if err!=nil { writer.WriteString("SERVER_ERROR\r\n"); writer.Flush(); return }
+
   buf, err := reader.ReadBytes('\n')
   if err!=nil {
     writer.WriteString("SERVER_ERROR\r\n"); writer.Flush()
     return
   }
 
-  me.KVStore.Set(args[1], buf[:bytes])
+  expiry:=time.Now().UTC().Add(time.Duration(expirytime)*time.Second)
+  me.KVStore.Set(args[1], buf[:], &expiry)
   writer.WriteString("STORED\r\n") 
   writer.Flush()
 }
@@ -160,8 +163,8 @@ func (me *MemcacheServer) handleGet(addr string, reader *bufio.Reader, writer *b
   }
   me.Logger.Debug("Memcache", "[%s] -> Get Key %s", addr, args[1])
   value, found := me.KVStore.Get(args[1])
-  me.Logger.Debug("Memcache", "[%s] -> Found %d, Data %s", addr, found, value)
   if found {
+    me.Logger.Debug("Memcache", "[%s] -> Found", addr)
     writer.WriteString(fmt.Sprintf("VALUE %s %s %d\r\n", args[1], "0",len(value)))
     writer.Write(value)
     writer.Write([]byte{ 13, 10 })

@@ -31,7 +31,9 @@ func main() {
 	}
 
   // Key/Value Store
-  kv := kvstore.NewKVStore()
+  kv := kvstore.NewKVStore(logger)
+  kv.Init()
+  kv.Start()
 
 	// Banner
 	logger.Info("Main", "---------------------------------------")
@@ -113,6 +115,9 @@ func main() {
   // Shutdown Server and wait for close
   svr.Stop()
   _ = <-svr.StatusChannel
+
+  // Shutdown KV Store
+  kv.Stop()
 
   logger.Info("Main", "Shutdown Complete, exiting")
   os.Exit(0)
