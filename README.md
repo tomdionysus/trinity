@@ -43,3 +43,6 @@ trinity-server --ca=<CA_PEM> --cert=<CERT_PEM> [flags]
 ## References
 
 * [Golang](https://golang.org)
+* [Consistent Hashing](https://en.wikipedia.org/wiki/Consistent_hashing)
+* [Transport Layer Security](https://tools.ietf.org/html/rfc5246)
+* [Memcache Protocol](https://github.com/memcached/memcached/blob/master/doc/protocol.txt)
