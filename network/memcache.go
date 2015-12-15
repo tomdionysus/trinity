@@ -81,9 +81,7 @@ func (me *MemcacheServer) handleConnection(addr string, conn net.Conn) {
   reader := bufio.NewReader(conn)
   writer := bufio.NewWriter(conn)
 
-  me.Logger.Debug("Memcache", "[%s] -> Sending Hello",addr)
-  writer.WriteString("# INFO Trinity Memcache Server\n")
-  writer.Flush()
+  me.Logger.Debug("Memcache", "[%s] -> Connected",addr)
   for {
     input, err := reader.ReadString('\n')
     if err != nil {
@@ -138,20 +136,31 @@ func (me *MemcacheServer) handleSet(addr string, reader *bufio.Reader, writer *b
 
   me.Logger.Debug("Memcache", "[%s] -> Set %s", addr, args)
 
-  _, err := strconv.Atoi(args[4])
+  bytes, err := strconv.Atoi(args[4])
   if err!=nil { writer.WriteString("SERVER_ERROR\r\n"); writer.Flush(); return }
 
   expirytime, err := strconv.Atoi(args[3])
   if err!=nil { writer.WriteString("SERVER_ERROR\r\n"); writer.Flush(); return }
 
-  buf, err := reader.ReadBytes('\n')
+  var buf []byte = make([]byte,bytes,bytes)
+  n, err := reader.Read(buf)
+  if err!=nil || n!=len(buf) {
+    writer.WriteString("SERVER_ERROR\r\n"); writer.Flush()
+    return
+  }
+
+  _, err = reader.ReadString('\n')
   if err!=nil {
     writer.WriteString("SERVER_ERROR\r\n"); writer.Flush()
     return
   }
 
-  expiry:=time.Now().UTC().Add(time.Duration(expirytime)*time.Second)
-  me.KVStore.Set(args[1], buf[:], &expiry)
+  var expparam *time.Time = nil
+  if expirytime!=0 {
+    expiry := time.Now().UTC().Add(time.Duration(expirytime)*time.Second)
+    expparam = &expiry 
+  }
+  me.KVStore.Set(args[1], buf[:], expparam)
   writer.WriteString("STORED\r\n") 
   writer.Flush()
 }
@@ -165,7 +174,7 @@ func (me *MemcacheServer) handleGet(addr string, reader *bufio.Reader, writer *b
   value, found := me.KVStore.Get(args[1])
   if found {
     me.Logger.Debug("Memcache", "[%s] -> Found", addr)
-    writer.WriteString(fmt.Sprintf("VALUE %s %s %d\r\n", args[1], "0",len(value)))
+    writer.WriteString(fmt.Sprintf("VALUE %s %s %d\r\n", args[1], "0", len(value)))
     writer.Write(value)
     writer.Write([]byte{ 13, 10 })
   }

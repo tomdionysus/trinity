@@ -52,11 +52,12 @@ func (me *KVStore) Stop() {
 
 func (me *KVStore) Set(key string, value []byte, expiry *time.Time) {
   me.store[key] = value
-  me.Logger.Debug("KVStore","Setting %s", key)
   if expiry!=nil {
     exptime := expiry.UTC().Unix()
-    me.Logger.Debug("KVStore","Setting %s Expiry %d", key, exptime)
+    me.Logger.Debug("KVStore","SET [%s] - Expiry %d", key, exptime)
     me.expiry[exptime] = append(me.expiry[exptime], key)
+  } else {
+    me.Logger.Debug("KVStore","SET [%s]", key)
   }
 }
 
@@ -67,13 +68,13 @@ func (me *KVStore) IsSet(key string) bool {
 
 func (me *KVStore) Get(key string) ([]byte, bool) {
   val, ok := me.store[key]
-  me.Logger.Debug("KVStore","Getting %s", key)
+  me.Logger.Debug("KVStore","GET [%s]", key)
   return val, ok
 }
 
 func (me *KVStore) Delete(key string) bool {
   _, ok := me.store[key]
-  me.Logger.Debug("KVStore","Deleting %s", key)
+  me.Logger.Debug("KVStore","DELETE [%s]", key)
   delete(me.store,key)
   return ok
 }
