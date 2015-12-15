@@ -1,4 +1,4 @@
-![Trinity DB Logo](gfx/trinity_m.png) 
+![Trinity DB Logo](../gfx/trinity_m.png) 
 
 # Trinity DB - Design Goals
 
