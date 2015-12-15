@@ -136,10 +136,14 @@ func (me *MemcacheServer) handleSet(addr string, reader *bufio.Reader, writer *b
 
   me.Logger.Debug("Memcache", "[%s] -> Set %s", addr, args)
 
-  bytes, err := strconv.Atoi(args[4])
+  expirytime, err := strconv.Atoi(args[3])
   if err!=nil { writer.WriteString("SERVER_ERROR\r\n"); writer.Flush(); return }
 
-  expirytime, err := strconv.Atoi(args[3])
+  flags, err := strconv.Atoi(args[2])
+  flags = flags & 0xFFFF
+  if err!=nil { writer.WriteString("SERVER_ERROR\r\n"); writer.Flush(); return }
+
+  bytes, err := strconv.Atoi(args[4])
   if err!=nil { writer.WriteString("SERVER_ERROR\r\n"); writer.Flush(); return }
 
   var buf []byte = make([]byte,bytes,bytes)
@@ -160,7 +164,7 @@ func (me *MemcacheServer) handleSet(addr string, reader *bufio.Reader, writer *b
     expiry := time.Now().UTC().Add(time.Duration(expirytime)*time.Second)
     expparam = &expiry 
   }
-  me.KVStore.Set(args[1], buf[:], expparam)
+  me.KVStore.Set(args[1], buf[:], int16(flags), expparam)
   writer.WriteString("STORED\r\n") 
   writer.Flush()
 }
@@ -171,10 +175,10 @@ func (me *MemcacheServer) handleGet(addr string, reader *bufio.Reader, writer *b
     return
   }
   me.Logger.Debug("Memcache", "[%s] -> Get Key %s", addr, args[1])
-  value, found := me.KVStore.Get(args[1])
+  value, flags, found := me.KVStore.Get(args[1])
   if found {
     me.Logger.Debug("Memcache", "[%s] -> Found", addr)
-    writer.WriteString(fmt.Sprintf("VALUE %s %s %d\r\n", args[1], "0", len(value)))
+    writer.WriteString(fmt.Sprintf("VALUE %s %d %d\r\n", args[1], flags, len(value)))
     writer.Write(value)
     writer.Write([]byte{ 13, 10 })
   }
