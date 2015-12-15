@@ -76,10 +76,12 @@ func (me *Peer) Connect() error {
 
 
 func (me *Peer) Disconnect() {
-  me.State = PeerStateDisconnected
-  me.Connection.Close()
-  me.HeartbeatTicker.Stop()
-  me.Logger.Info("Peer", "Disconnected: %s", me.Connection.RemoteAddr())
+  if me.State == PeerStateConnected {
+    me.State = PeerStateDisconnected
+    if me.Connection!=nil { me.Connection.Close() }
+    if me.HeartbeatTicker!=nil { me.HeartbeatTicker.Stop() }
+    me.Logger.Info("Peer", "Disconnected: %s", me.Connection.RemoteAddr())
+  }
 }
 
 func (me *Peer) Start() error {
@@ -169,6 +171,12 @@ func (me *Peer) process() {
   end:
 
   me.Disconnect()
+}
+
+func (me *Peer) SendDistribution() error {
+  packet := packets.NewPacket(packets.CMD_DISTRIBUTION, "TestDistrib!")
+  me.SendPacket(packet)
+  return nil
 }
 
 func (me *Peer) SendPacket(packet *packets.Packet) error {

@@ -14,6 +14,8 @@ type Config struct {
   Certificate *string
   Port *int
   LogLevel *string
+  MemcacheEnabled *bool
+  MemcachePort *int
 }
 
 func (me *NodeURLs) Set(value string) (error) {
@@ -32,6 +34,8 @@ func NewConfig() *Config {
   inst.CA = flag.String("ca", "", "CA PEM file")
   inst.LogLevel = flag.String("loglevel", "error", "Logging Level [error,warn,info,debug]")
   inst.Port = flag.Int("port", 13531, "Cluster port")
+  inst.MemcacheEnabled = flag.Bool("memcache", false, "Enable Memcache Server")
+  inst.MemcachePort = flag.Int("memcacheport", 11211, "Memcache port")
   flag.Parse()
   return inst
 }

@@ -6,7 +6,8 @@ import (
   "github.com/tomdionysus/trinity/network"
 	"github.com/tomdionysus/trinity/util"
   "github.com/tomdionysus/trinity/config"
-	"github.com/tomdionysus/trinity/packets"
+  "github.com/tomdionysus/trinity/kvstore"
+	// "github.com/tomdionysus/trinity/packets"
 	"os"
 	"os/signal"
 	"syscall"
@@ -29,6 +30,9 @@ func main() {
 		logger.Fatal("Main", "Bad Configuration, Exiting")
 	}
 
+  // Key/Value Store
+  kv := kvstore.NewKVStore()
+
 	// Banner
 	logger.Info("Main", "---------------------------------------")
 	logger.Info("Main", "Trinity DB - v%s", VERSION)
@@ -40,7 +44,6 @@ func main() {
 	logger.Debug("Config","Port: %d", *config.Port)
 	logger.Debug("Config","LogLevel: %s (%d)", *config.LogLevel, logger.LogLevel)
 
-
   // CA
   capool := network.NewCAPool(logger)
   err := capool.LoadPEM(*config.CA)
@@ -51,7 +54,7 @@ func main() {
   logger.Debug("Main", "CA Certiticate Loaded") 
 
 	// Server
-	svr := network.NewTLSServer(logger, capool)
+	svr := network.NewTLSServer(logger, capool, kv)
   
 	// Certificate
 	err = svr.LoadPEMCert(*config.Certificate, *config.Certificate)
@@ -68,6 +71,15 @@ func main() {
 		os.Exit(-1)
 	}
 
+  var memcache *network.MemcacheServer
+
+  // Memcache
+  if *config.MemcacheEnabled {
+    memcache = network.NewMemcacheServer(logger, *config.MemcachePort, kv)
+    memcache.Init()
+    memcache.Start()
+  }
+
 	// Notify SIGINT, SIGTERM
 	c := make(chan os.Signal, 1)
   signal.Notify(c, os.Interrupt)
@@ -80,9 +92,6 @@ func main() {
   		err := client.Connect()
       if err == nil {
         client.Start()
-
-        packet := packets.NewPacket(packets.CMD_DISTRIBUTION, "TestDistrib!")
-        client.SendPacket(packet)
       }
   	}
 	}
@@ -97,6 +106,9 @@ func main() {
   }
 
   end:
+
+  // Shutdown Memcache
+  if memcache!=nil { memcache.Stop() }
 
   // Shutdown Server and wait for close
   svr.Stop()

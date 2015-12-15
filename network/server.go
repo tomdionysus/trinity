@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"net"
 	"github.com/tomdionysus/trinity/util"
+	"github.com/tomdionysus/trinity/kvstore"
 	"fmt"
 )
 
@@ -22,6 +23,7 @@ type TLSServer struct {
 	StatusChannel chan(int)
 
 	CAPool *CAPool
+	KVStore *kvstore.KVStore
 
 	SessionCache tls.ClientSessionCache
 	Connections map[string]Peer
@@ -29,13 +31,14 @@ type TLSServer struct {
 	listener net.Listener
 }
 
-func NewTLSServer(logger *util.Logger, caPool *CAPool) *TLSServer {
+func NewTLSServer(logger *util.Logger, caPool *CAPool, kvStore *kvstore.KVStore) *TLSServer {
 	return &TLSServer{
 		Logger: logger,
 		ControlChannel: make(chan(int)),
 		StatusChannel: make(chan(int)),
 		Connections: map[string]Peer{},
 		SessionCache: tls.NewLRUClientSessionCache(64),
+		KVStore: kvStore,
 		CAPool: caPool,
 	}
 }
