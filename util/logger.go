@@ -24,6 +24,10 @@ func NewLogger(logLevel string) *Logger {
   return logger
 }
 
+func (me *Logger) Raw(component string, message string, args... interface{}) {
+  me.printLog(component,"-----",message, args...)
+}
+
 func (me *Logger) Fatal(component string, message string, args... interface{}) {
   me.printLog(component,"FATAL",message, args...)
 }

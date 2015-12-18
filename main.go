@@ -36,9 +36,9 @@ func main() {
   kv.Start()
 
 	// Banner
-	logger.Info("Main", "---------------------------------------")
-	logger.Info("Main", "Trinity DB - v%s", VERSION)
-	logger.Info("Main", "---------------------------------------")
+	logger.Raw("Main", "---------------------------------------")
+	logger.Raw("Main", "Trinity DB - v%s", VERSION)
+	logger.Raw("Main", "---------------------------------------")
 
 	// Config Debug
 	logger.Debug("Config","Nodes: %s", config.Nodes.String())

@@ -155,7 +155,11 @@ func (me *Peer) process() {
     // Read Command
     err := me.Reader.Decode(&packet)
     if err!=nil {
-      me.Logger.Error("Peer", "%s: Error Reading: %s", me.Connection.RemoteAddr(), err.Error())
+      if err.Error()=="EOF" {
+        me.Logger.Debug("Peer", "%s: Peer Closed Connection", me.Connection.RemoteAddr())
+      } else {
+        me.Logger.Error("Peer", "%s: Error Reading: %s", me.Connection.RemoteAddr(), err.Error())
+      }
       goto end
     }
     switch (packet.Command) {
