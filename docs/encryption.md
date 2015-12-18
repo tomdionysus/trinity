@@ -15,7 +15,7 @@ Encryption, TLS and x509 are complex subjects and thorough study is recommended 
 
 To ease evaluation, a 'snakeoil' CA and Node certificate are provided in the [cert/](../cert) directory. **IMPORTANT: You should NEVER use these for anything except development**.
 
-The two files `ca.pem` and `localhost.pem` represent a CA cert and a signed certificate for `localhost` signed by that CA.
+The two files `ca.pem` and `localhost.pem` represent a CA cert and a certificate for `localhost` signed by that CA.
 
 ## EasyRSA
 
