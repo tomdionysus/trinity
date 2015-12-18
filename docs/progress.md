@@ -8,7 +8,9 @@ As of late Dec 2015, Trinity is pre-alpha. The basic node infrastructure is most
 
 The next step will be to have the nodes communicate with each other and swap node lists, with auto-connection to all available nodes. The idea is that every node will be ideally connected to every other node.
 
-After that, each node should support a consistent hashing distribution circle of its own, and swap its distribution to other nodes. Then, the KV store will be adapted to store data on the appropriate node, plus the next 2 nodes on the circle. When a node joins, the other nodes should integrate its distribution into their circles in a 'syncing' (not readable) state and automatically copy the appropriate keys and values into the new node, calculating the new two recovery nodes and causing them to check that the appropriate keys and values exist, and sending delete notifications for each key to all other nodes. In detail:
+After that, each node should support a consistent hashing distribution circle of its own, and swap its distribution to other nodes. Then, the KV store will be adapted to store data on the appropriate node, plus the next 2 nodes on the circle. When a node joins, the other nodes should integrate its distribution into their circles in a 'syncing' (not readable) state and automatically copy the appropriate keys and values into the new node, calculating the new two recovery nodes and causing them to check that the appropriate keys and values exist, and sending delete notifications for each key to all other nodes.
+
+**2015-12-18:** On a very valid suggestion from [@maetl](https://github.com/maetl) I've added snakeoil CA and peer certificates and quickstart [README](../README.md) to make spinning Trinity up for evaluation easier.  
 
 ## Completed
 
