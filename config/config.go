@@ -16,6 +16,7 @@ type Config struct {
   LogLevel *string
   MemcacheEnabled *bool
   MemcachePort *int
+  HostAddr *string
 }
 
 func (me *NodeURLs) Set(value string) (error) {
@@ -36,6 +37,7 @@ func NewConfig() *Config {
   inst.Port = flag.Int("port", 13531, "Cluster port")
   inst.MemcacheEnabled = flag.Bool("memcache", false, "Enable Memcache Server")
   inst.MemcachePort = flag.Int("memcacheport", 11211, "Memcache port")
+  inst.HostAddr = flag.String("hostaddr", "localhost:13531", "Advertisted hostname:port")
   flag.Parse()
   return inst
 }

@@ -9,7 +9,7 @@ import (
 const(
   CMD_HEARTBEAT = 1
   CMD_DISTRIBUTION = 2
-  CMD_PEERLIST = 2
+  CMD_PEERLIST = 3
 
   PacketIDSize = 8
 )

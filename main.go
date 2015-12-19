@@ -56,7 +56,7 @@ func main() {
   logger.Debug("Main", "CA Certiticate Loaded") 
 
 	// Server
-	svr := network.NewTLSServer(logger, capool, kv)
+	svr := network.NewTLSServer(logger, capool, kv, *config.HostAddr)
   
 	// Certificate
 	err = svr.LoadPEMCert(*config.Certificate, *config.Certificate)
@@ -86,24 +86,30 @@ func main() {
 	c := make(chan os.Signal, 1)
   signal.Notify(c, os.Interrupt)
   signal.Notify(c, syscall.SIGTERM)
+  signal.Notify(c, syscall.SIGINFO)
 
   // TEST: Connect to other nodes
-  if len(config.Nodes)>0 {
-  	for _, url := range config.Nodes {
-      client := network.NewPeer(logger, svr, url)
-  		err := client.Connect()
-      if err == nil {
-        client.Start()
-      }
-  	}
-	}
+  for _, remoteAddr := range config.Nodes {
+    svr.ConnectTo(remoteAddr)
+  }
 
 	// Wait for SIGINT
   for {
   	select {
-  		case <-c:
-  			logger.Info("Main", "SIGINT recieved, shutting down")
-  			goto end
+  		case sig := <-c:
+        switch sig {
+          case syscall.SIGINFO:
+            logger.Info("Main", "Status: Node ID %02X", svr.ServerNode.ID)
+            logger.Info("Main", "Status: Listener Address %s", svr.Listener.Addr())
+            for _, peer := range svr.Connections { 
+              logger.Info("Main", "Status: Peer %02X (%s -> %s), %s", peer.ServerNetworkNode.ID, peer.Connection.LocalAddr(), peer.Connection.RemoteAddr(), network.PeerStateString[peer.State])
+            }
+          case os.Interrupt:
+            fallthrough
+          case syscall.SIGTERM:
+            logger.Info("Main", "Signal %d recieved, shutting down", sig)
+            goto end
+      }
   	}
   }
 

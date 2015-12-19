@@ -3,6 +3,7 @@ package network
 import ( 
   "github.com/tomdionysus/trinity/util"
   "github.com/tomdionysus/trinity/packets"
+  "github.com/tomdionysus/trinity/consistenthash"
   "crypto/tls"
   "errors"
   // "bytes"
@@ -18,6 +19,14 @@ const (
   PeerStateDefib = iota
 )
 
+var PeerStateString map[uint]string = map[uint]string{
+  PeerStateDisconnected: "PeerStateDisconnected",
+  PeerStateConnecting: "PeerStateConnecting",
+  PeerStateHandshake: "PeerStateHandshake",
+  PeerStateConnected: "PeerStateConnected",
+  PeerStateDefib: "PeerStateDefib",
+}
+
 type Peer struct {
   Logger *util.Logger
   Server *TLSServer
@@ -32,6 +41,8 @@ type Peer struct {
   Reader *gob.Decoder
 
   LastHeartbeat time.Time
+
+  ServerNetworkNode *consistenthash.ServerNetworkNode
 }
 
 func NewPeer(logger *util.Logger, server *TLSServer, address string) *Peer {
@@ -41,6 +52,7 @@ func NewPeer(logger *util.Logger, server *TLSServer, address string) *Peer {
     State: PeerStateDisconnected,
     Server: server,
     LastHeartbeat: time.Now(),
+    ServerNetworkNode: nil,
   }
   return inst
 }
@@ -81,6 +93,7 @@ func (me *Peer) Disconnect() {
     if me.Connection!=nil { me.Connection.Close() }
     if me.HeartbeatTicker!=nil { me.HeartbeatTicker.Stop() }
     me.Logger.Info("Peer", "Disconnected: %s", me.Connection.RemoteAddr())
+    delete(me.Server.Connections, me.ServerNetworkNode.ID)
   }
 }
 
@@ -109,6 +122,10 @@ func (me *Peer) Start() error {
   me.Writer = gob.NewEncoder(me.Connection)
 
   go me.heartbeat()
+
+  me.SendDistribution()
+  me.SendPeerlist()
+
   go me.process()
 
   return nil
@@ -123,7 +140,7 @@ func (me *Peer) heartbeat() {
 
     // Check For Defib
     if time.Now().After(me.LastHeartbeat.Add(5 * time.Second)) {
-      me.Logger.Warn("Peer", "%s: Peer in Defib (no response for 5 seconds)", me.Connection.RemoteAddr())
+      me.Logger.Warn("Peer", "%s: Peer Defib (no response for 5 seconds)", me.Connection.RemoteAddr())
       me.State = PeerStateDefib
     }
 
@@ -164,10 +181,34 @@ func (me *Peer) process() {
     }
     switch (packet.Command) {
       case packets.CMD_HEARTBEAT:
-        // me.Logger.Debug("Peer", "%s: CMD_HEARTBEAT", me.Connection.RemoteAddr())
         me.LastHeartbeat = time.Now()
       case packets.CMD_DISTRIBUTION:
-        me.Logger.Debug("Peer", "%s: CMD_DISTRIBUTION: %s", me.Connection.RemoteAddr(), packet.Payload)
+        me.Logger.Debug("Peer", "%s: CMD_DISTRIBUTION", me.Connection.RemoteAddr())
+        servernetworknode := packet.Payload.(consistenthash.ServerNetworkNode)
+        me.ServerNetworkNode = &servernetworknode
+        me.Server.Connections[me.ServerNetworkNode.ID] = me
+        err := me.Server.ServerNode.AddToNetwork(me.ServerNetworkNode)
+        if err!=nil {
+          me.Logger.Error("Peer","Adding Node ID %02x Failed: %s", me.ServerNetworkNode.ID, err.Error())
+        }
+        me.Server.NotifyNewPeer(me)
+      case packets.CMD_KVSTORE:
+        me.Logger.Debug("Peer", "%s: CMD_KVSTORE", me.Connection.RemoteAddr())
+      case packets.CMD_PEERLIST:
+        peers := packet.Payload.([]string)
+        me.Logger.Debug("Peer", "%s: CMD_PEERLIST (%d Peers)", me.Connection.RemoteAddr(), len(peers))
+        for _, k := range peers {
+          if me.Server.Listener.Addr().String() == k {
+            me.Logger.Error("Peer", "%s: - Peer %s us of ourselves.", me.Connection.RemoteAddr(), k)       
+          } else {
+            if !me.Server.IsConnectedTo(k)  {
+              me.Logger.Debug("Peer", "%s: - Connecting New Peer %s", me.Connection.RemoteAddr(), k)
+              me.Server.ConnectTo(k)
+            } else {
+              me.Logger.Debug("Peer", "%s: - Already Connected to Peer %s", me.Connection.RemoteAddr(), k)
+            }
+          }
+        }
       default:
         me.Logger.Warn("Peer", "%s: Unknown Packet Command %d", me.Connection.RemoteAddr(), packet.Command)
     }
@@ -177,8 +218,18 @@ func (me *Peer) process() {
   me.Disconnect()
 }
 
+func (me *Peer) SendPeerlist() error {
+  peers := []string{}
+  for _, peer := range me.Server.Connections { 
+    if peer.ServerNetworkNode!=nil && peer.ServerNetworkNode.ID != me.Server.ServerNode.ID { peers = append(peers, peer.ServerNetworkNode.HostAddr) }
+  }
+  packet := packets.NewPacket(packets.CMD_PEERLIST, peers)
+  me.SendPacket(packet)
+  return nil
+}
+
 func (me *Peer) SendDistribution() error {
-  packet := packets.NewPacket(packets.CMD_DISTRIBUTION, "TestDistrib!")
+  packet := packets.NewPacket(packets.CMD_DISTRIBUTION, me.Server.ServerNode.ServerNetworkNode)
   me.SendPacket(packet)
   return nil
 }
