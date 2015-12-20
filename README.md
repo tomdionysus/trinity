@@ -51,6 +51,11 @@ trinity-server --ca=<CA_PEM> --cert=<CERT_PEM> [other flags]
 | [Progress](docs/progress.md)         | Project Progress                                       |
 | [Encryption](docs/encryption.md)     | Encryption and security guide                          |
 
+## Component Package Repositories
+
+* [github.com/tomdionysus/binarytree](https://github.com/tomdionysus/binarytree)
+* [github.com/tomdionysus/bplustree](https://github.com/tomdionysus/bplustree)
+
 ## References
 
 * [Golang](https://golang.org)

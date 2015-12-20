@@ -8,6 +8,8 @@ As of late Dec 2015, Trinity is pre-alpha. The basic node infrastructure is most
 
 Next up, the KV store will be adapted to store data on the appropriate node, plus the next 2 nodes on the circle. When a node joins, the other nodes should integrate its distribution into their circles in a 'syncing' (not readable) state and automatically copy the appropriate keys and values into the new node, calculating the new two recovery nodes and causing them to check that the appropriate keys and values exist, and sending delete notifications for each key to all other nodes.
 
+Work continues on [bplustree](https://github.com/tomdionysus/bplustree) which will become the backend store for KV data.
+
 **2015-12-18:** On a very valid suggestion from [@maetl](https://github.com/maetl) I've added snakeoil CA and peer certificates and quickstart [README](../README.md) to make spinning Trinity up for evaluation easier.  
 
 ## Completed
