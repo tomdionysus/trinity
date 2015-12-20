@@ -23,7 +23,7 @@ You can boot other nodes on different ports and have them connect to the cluster
 
 ```bash
 build/trinity-server --ca cert/ca.pem --cert cert/localhost.pem --loglevel info -port 13532 -node localhost:13531
-build/trinity-server --ca cert/ca.pem --cert cert/localhost.pem --loglevel info -port 13532 -node localhost:13531
+build/trinity-server --ca cert/ca.pem --cert cert/localhost.pem --loglevel info -port 13533 -node localhost:13531
 ```
 
 ## Usage
