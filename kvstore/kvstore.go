@@ -55,10 +55,10 @@ func (me *KVStore) Set(key string, value []byte, flags int16, expiry *time.Time)
   me.flags[key] = flags
   if expiry!=nil {
     exptime := expiry.UTC().Unix()
-    me.Logger.Debug("KVStore","SET [%s] - Expiry %d", key, exptime)
+    me.Logger.Debug("KVStore","SET [%s] %s - Expiry %d", key, value, exptime)
     me.expiry[exptime] = append(me.expiry[exptime], key)
   } else {
-    me.Logger.Debug("KVStore","SET [%s]", key)
+    me.Logger.Debug("KVStore","SET [%s] %s", key, value)
   }
 }
 
@@ -68,10 +68,15 @@ func (me *KVStore) IsSet(key string) bool {
 }
 
 func (me *KVStore) Get(key string) ([]byte, int16, bool) {
-  val, ok := me.store[key]
-  flags, ok := me.flags[key]
-  me.Logger.Debug("KVStore","GET [%s]", key)
-  return val, flags, ok
+  value, ok := me.store[key]
+  if ok {
+    flags, ok := me.flags[key]
+    me.Logger.Debug("KVStore","GET [%s] %s", key, value)
+    return value, flags, ok
+  } else {
+    me.Logger.Debug("KVStore","GET [%s] NOT FOUND", key)
+    return nil, 0, false
+  }
 }
 
 func (me *KVStore) Delete(key string) bool {

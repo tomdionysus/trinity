@@ -5,11 +5,11 @@ import(
   "time"
 )
 
-func GetRandomID(size int) []byte {
+func GetRandomID() [16]byte {
   rand.Seed(time.Now().UTC().UnixNano())
-  b := []byte{}
-  for i:=0; i<size; i++ {
-    b = append(b, byte(rand.Intn(256)))
+  b := [16]byte{}
+  for i:=0; i<16; i++ {
+    b[i] = byte(rand.Intn(256))
   }
   return b
 }

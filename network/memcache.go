@@ -3,7 +3,6 @@ package network
 import (
   "net"
   "github.com/tomdionysus/trinity/util"
-  "github.com/tomdionysus/trinity/kvstore"
   "fmt"
   "bufio"
   "strings"
@@ -14,17 +13,17 @@ import (
 type MemcacheServer struct {
   Logger *util.Logger
   Port int
-  KVStore *kvstore.KVStore
+  Server *TLSServer
   Listener net.Listener
 
   Connections map[string]net.Conn
 }
 
-func NewMemcacheServer(logger *util.Logger, port int, kv *kvstore.KVStore) *MemcacheServer {
+func NewMemcacheServer(logger *util.Logger, port int, server *TLSServer) *MemcacheServer {
   inst := &MemcacheServer{
     Logger: logger,
     Port: port,
-    KVStore: kv,
+    Server: server,
     Connections: map[string]net.Conn{},
   }
   return inst
@@ -164,7 +163,7 @@ func (me *MemcacheServer) handleSet(addr string, reader *bufio.Reader, writer *b
     expiry := time.Now().UTC().Add(time.Duration(expirytime)*time.Second)
     expparam = &expiry 
   }
-  me.KVStore.Set(args[1], buf[:], int16(flags), expparam)
+  me.Server.SetKey(args[1], buf[:], int16(flags), expparam)
   writer.WriteString("STORED\r\n") 
   writer.Flush()
 }
@@ -175,7 +174,7 @@ func (me *MemcacheServer) handleGet(addr string, reader *bufio.Reader, writer *b
     return
   }
   me.Logger.Debug("Memcache", "[%s] -> Get Key %s", addr, args[1])
-  value, flags, found := me.KVStore.Get(args[1])
+  value, flags, found := me.Server.GetKey(args[1])
   if found {
     me.Logger.Debug("Memcache", "[%s] -> Found", addr)
     writer.WriteString(fmt.Sprintf("VALUE %s %d %d\r\n", args[1], flags, len(value)))
@@ -191,7 +190,7 @@ func (me *MemcacheServer) handleDelete(addr string, reader *bufio.Reader, writer
     return
   }
   me.Logger.Debug("Memcache", "[%s] -> Delete Key %s", addr, args[1])
-  found := me.KVStore.Delete(args[1])
+  found := me.Server.DeleteKey(args[1])
   if found {
     me.Logger.Debug("Memcache", "[%s] -> Found", addr)
     writer.WriteString("DELETED\r\n"); writer.Flush()

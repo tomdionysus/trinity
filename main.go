@@ -77,7 +77,7 @@ func main() {
 
   // Memcache
   if *config.MemcacheEnabled {
-    memcache = network.NewMemcacheServer(logger, *config.MemcachePort, kv)
+    memcache = network.NewMemcacheServer(logger, *config.MemcachePort, svr)
     memcache.Init()
     memcache.Start()
   }

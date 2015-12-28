@@ -43,6 +43,8 @@ type Peer struct {
   LastHeartbeat time.Time
 
   ServerNetworkNode *consistenthash.ServerNetworkNode
+
+  Replies map[[16]byte]chan(*packets.Packet)
 }
 
 func NewPeer(logger *util.Logger, server *TLSServer, address string) *Peer {
@@ -53,6 +55,7 @@ func NewPeer(logger *util.Logger, server *TLSServer, address string) *Peer {
     Server: server,
     LastHeartbeat: time.Now(),
     ServerNetworkNode: nil,
+    Replies: map[[16]byte]chan(*packets.Packet){},
   }
   return inst
 }
@@ -194,6 +197,13 @@ func (me *Peer) process() {
         me.Server.NotifyNewPeer(me)
       case packets.CMD_KVSTORE:
         me.Logger.Debug("Peer", "%s: CMD_KVSTORE", me.Connection.RemoteAddr())
+        me.handleKVStorePacket(&packet)
+      case packets.CMD_KVSTORE_ACK:
+        me.Logger.Debug("Peer", "%s: CMD_KVSTORE_ACK", me.Connection.RemoteAddr())
+        me.handleReply(&packet)
+      case packets.CMD_KVSTORE_NOT_FOUND:
+        me.Logger.Debug("Peer", "%s: CMD_KVSTORE_NOT_FOUND", me.Connection.RemoteAddr())
+        me.handleReply(&packet)
       case packets.CMD_PEERLIST:
         peers := packet.Payload.([]string)
         me.Logger.Debug("Peer", "%s: CMD_PEERLIST (%d Peers)", me.Connection.RemoteAddr(), len(peers))
@@ -216,6 +226,16 @@ func (me *Peer) process() {
   end:
 
   me.Disconnect()
+}
+
+func (me *Peer) handleReply(packet *packets.Packet) {
+  chn, found := me.Replies[packet.RequestID]
+  if found {
+    delete(me.Replies, packet.RequestID)
+    chn <- packet
+  } else {
+    me.Logger.Warn("Peer", "%s: Unsolicited Reply to unknown packet %02X", me.Connection.RemoteAddr(), packet.RequestID)
+  }
 }
 
 func (me *Peer) SendPeerlist() error {
@@ -241,3 +261,83 @@ func (me *Peer) SendPacket(packet *packets.Packet) error {
   }
   return err
 }
+
+func (me *Peer) SendPacketWaitReply(packet *packets.Packet, timeout time.Duration) (*packets.Packet, error) {
+  me.Replies[packet.ID] = make(chan(*packets.Packet))
+  me.SendPacket(packet)
+  reply := <- me.Replies[packet.ID]
+  me.Logger.Debug("Peer", "%s: Got Reply %02X for packet ID %02X", me.Connection.RemoteAddr(), reply.ID, packet.ID)
+  return reply, nil
+}
+
+func (me *Peer) handleKVStorePacket(packet *packets.Packet) {
+  kvpacket := packet.Payload.(packets.KVStorePacket)
+  switch kvpacket.Command {
+  case packets.CMD_KVSTORE_SET:
+    me.handleKVStoreSet(&kvpacket, packet)
+  case packets.CMD_KVSTORE_GET:
+    me.handleKVStoreGet(&kvpacket, packet)
+  case packets.CMD_KVSTORE_DELETE:
+    me.handleKVStoreDelete(&kvpacket, packet)
+  default:
+    me.Logger.Error("Peer", "KVStorePacket: Unknown Command %d", packet.Command)
+  }
+}
+
+func (me *Peer) handleKVStoreSet(packet *packets.KVStorePacket, request *packets.Packet) {
+  me.Logger.Debug("Peer", "%s: KVStoreSet: %s = %s", me.Connection.RemoteAddr(), packet.Key, packet.Data)
+  me.Server.KVStore.Set(
+    packet.Key,
+    packet.Data,
+    packet.Flags,
+    packet.ExpiresAt)
+
+  response := packets.NewResponsePacket(packets.CMD_KVSTORE_ACK, request.ID, packet.Key)
+    me.Logger.Debug("Peer", "%s: KVStoreSet: %s Acknowledge, replying", me.Connection.RemoteAddr(), packet.Key)
+  me.SendPacket(response)
+}
+
+func (me *Peer) handleKVStoreGet(packet *packets.KVStorePacket, request *packets.Packet) {
+  me.Logger.Debug("Peer", "%s: KVStoreGet: %s", me.Connection.RemoteAddr(), packet.Key)
+  value, flags, found := me.Server.KVStore.Get(packet.Key)
+
+  var response *packets.Packet
+
+  if found {
+    payload := packets.KVStorePacket{
+      Command: packets.CMD_KVSTORE_GET,
+      Key: packet.Key,
+      Data: value,
+      Flags: flags,
+    }
+    response = packets.NewResponsePacket(packets.CMD_KVSTORE_ACK, request.ID, payload)
+    me.Logger.Debug("Peer", "%s: KVStoreGet: %s = %s, replying", me.Connection.RemoteAddr(), packet.Key, value)
+  } else {
+    response = packets.NewResponsePacket(packets.CMD_KVSTORE_NOT_FOUND, request.ID, packet.Key)
+    me.Logger.Debug("Peer", "%s: KVStoreGet: %s Not found, replying", me.Connection.RemoteAddr(), packet.Key)
+  }
+
+  me.SendPacket(response)
+}
+
+func (me *Peer) handleKVStoreDelete(packet *packets.KVStorePacket, request *packets.Packet) {
+  me.Logger.Debug("Peer", "%s: KVStoreDelete: %s", me.Connection.RemoteAddr(), packet.Key)
+  found := me.Server.KVStore.Delete(packet.Key)
+  
+  var response *packets.Packet
+
+  if found {
+    response = packets.NewResponsePacket(packets.CMD_KVSTORE_ACK, request.ID, packet.Key)
+    me.Logger.Debug("Peer", "%s: KVStoreDelete: %s Deleted, replying", me.Connection.RemoteAddr(), packet.Key)
+  } else {
+    response = packets.NewResponsePacket(packets.CMD_KVSTORE_NOT_FOUND, request.ID, packet.Key)
+    me.Logger.Debug("Peer", "%s: KVStoreDelete: %s Not found, replying", me.Connection.RemoteAddr(), packet.Key)
+  }
+
+  me.SendPacket(response)
+}
+
+
+
+
+

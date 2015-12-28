@@ -10,13 +10,12 @@ const(
   CMD_HEARTBEAT = 1
   CMD_DISTRIBUTION = 2
   CMD_PEERLIST = 3
-
-  PacketIDSize = 8
 )
 
 type Packet struct {
   Command uint16
-  ID []byte
+  ID [16]byte
+  RequestID [16]byte
   Sent time.Time
 
   Payload interface{}
@@ -25,7 +24,18 @@ type Packet struct {
 func NewPacket(command uint16, payload interface{}) *Packet {
   inst := &Packet{
     Command: command,
-    ID: util.GetRandomID(PacketIDSize),
+    ID: util.GetRandomID(),
+    Sent: time.Now(),
+    Payload: payload,
+  }
+  return inst
+}
+
+func NewResponsePacket(command uint16, requestid [16]byte, payload interface{}) *Packet {
+  inst := &Packet{
+    Command: command,
+    ID: util.GetRandomID(),
+    RequestID: requestid,
     Sent: time.Now(),
     Payload: payload,
   }

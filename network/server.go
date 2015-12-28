@@ -4,6 +4,7 @@ import (
   "crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/md5"
 	"net"
 	"github.com/tomdionysus/trinity/util"
 	"github.com/tomdionysus/trinity/kvstore"
@@ -12,6 +13,7 @@ import (
 	"fmt"
 	"encoding/gob"
 	"errors"
+	"time"
 )
 
 const (
@@ -38,7 +40,7 @@ type TLSServer struct {
 }
 
 func NewTLSServer(logger *util.Logger, caPool *CAPool, kvStore *kvstore.KVStore, hostname string) *TLSServer {
-	return &TLSServer{
+	inst := &TLSServer{
 		ServerNode: consistenthash.NewServerNode(hostname),
 		Logger: logger,
 		ControlChannel: make(chan(int)),
@@ -48,6 +50,8 @@ func NewTLSServer(logger *util.Logger, caPool *CAPool, kvStore *kvstore.KVStore,
 		KVStore: kvStore,
 		CAPool: caPool,
 	}
+	inst.Logger.Debug("Server","Trinity Node ID %02X", inst.ServerNode.ID)
+	return inst 
 }
 
 func (me *TLSServer) LoadPEMCert(certFile string, keyFile string) error {
@@ -122,6 +126,115 @@ func (me *TLSServer) NotifyNewPeer(newPeer *Peer) {
 			peer.SendPacket(packet)
 		}
 	}
+}
+
+// Distributed Key Value store methods
+
+func (me *TLSServer) SetKey(key string, value []byte, flags int16, expiry *time.Time) {
+	keymd5 := getMD5(key)
+	node := me.ServerNode.GetNodeFor(keymd5)
+	if node.ID == me.ServerNode.ID {
+		me.Logger.Debug("Server","SetKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
+		// Local set.
+		me.KVStore.Set(key, value, flags, expiry)
+	} else {
+		me.Logger.Debug("Server","SetKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
+		// Remote Set.
+		payload := packets.KVStorePacket{
+			Command: packets.CMD_KVSTORE_SET,
+			Key: key,
+			KeyHash: keymd5,
+			Data: value,
+			ExpiresAt: expiry,
+			Flags: flags,
+			TargetID: node.ID,
+		}
+		packet := packets.NewPacket(packets.CMD_KVSTORE, payload)
+		me.Connections[node.ID].SendPacketWaitReply(packet, 0)
+	}
+}
+
+func (me *TLSServer) GetKey(key string) ([]byte, int16, bool) {
+	keymd5 := getMD5(key)
+	node := me.ServerNode.GetNodeFor(keymd5)
+	if node.ID == me.ServerNode.ID {
+		me.Logger.Debug("Server","GetKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
+		// Local set.
+		return me.KVStore.Get(key)
+	} else {
+		me.Logger.Debug("Server","GetKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
+		// Remote Set.
+		payload := packets.KVStorePacket{
+			Command: packets.CMD_KVSTORE_GET,
+			Key: key,
+			KeyHash: keymd5,
+			TargetID: node.ID,
+		}
+		packet := packets.NewPacket(packets.CMD_KVSTORE, payload)
+		reply, err := me.Connections[node.ID].SendPacketWaitReply(packet, 0)
+		
+		// Process reply or timeout
+		if err==nil {
+			switch reply.Command {
+			case packets.CMD_KVSTORE_ACK:
+				kvpacket := reply.Payload.(packets.KVStorePacket)
+				me.Logger.Debug("Server","GetKey: Reply from Remote %s = %s", key, kvpacket.Data)
+				return kvpacket.Data, kvpacket.Flags, true
+			case packets.CMD_KVSTORE_NOT_FOUND:
+				me.Logger.Debug("Server","GetKey: Reply from Remote %s Not Found", key)
+				return []byte{}, 0, false
+			default:
+				me.Logger.Warn("Server","GetKey: Unknown Reply Command %d", reply.Command)
+			}
+		} else {
+			me.Logger.Warn("Server","GetKey: Reply Timeout")
+			// TODO: Timeout
+		}
+	}
+	return []byte{}, 0, false
+}
+
+func (me *TLSServer) DeleteKey(key string) bool {
+	keymd5 := getMD5(key)
+	node := me.ServerNode.GetNodeFor(keymd5)
+	if node.ID == me.ServerNode.ID {
+		me.Logger.Debug("Server","DeleteKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
+		// Local set.
+		return me.KVStore.Delete(key)
+	} else {
+		me.Logger.Debug("Server","DeleteKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
+		// Remote Set.
+		payload := packets.KVStorePacket{
+			Command: packets.CMD_KVSTORE_DELETE,
+			Key: key,
+			KeyHash: keymd5,
+			TargetID: node.ID,
+		}
+		packet := packets.NewPacket(packets.CMD_KVSTORE, payload)
+		reply, err := me.Connections[node.ID].SendPacketWaitReply(packet, 0)
+		
+		// Process reply or timeout
+		if err==nil {
+			switch reply.Command {
+			case packets.CMD_KVSTORE_ACK:
+				me.Logger.Debug("Server","DeleteKey: Reply from Remote %s Deleted", key)
+				return true
+			case packets.CMD_KVSTORE_NOT_FOUND:
+				me.Logger.Debug("Server","DeleteKey: Reply from Remote %s Not Found", key)
+				return false
+			default:
+				me.Logger.Warn("Server","DeleteKey: Unknown Reply Command %d", reply.Command)
+			}
+		} else {
+			me.Logger.Warn("Server","DeleteKey: Reply Timeout")
+			// TODO: Timeout
+		}
+	}
+	return false
+}
+
+func getMD5(keystring string) consistenthash.Key {
+	return consistenthash.Key(md5.Sum([]byte(keystring)))
 }
 
 // func (me *TLSServer) Broadcast()
