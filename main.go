@@ -86,7 +86,7 @@ func main() {
 	c := make(chan os.Signal, 1)
   signal.Notify(c, os.Interrupt)
   signal.Notify(c, syscall.SIGTERM)
-  signal.Notify(c, syscall.SIGINFO)
+  // signal.Notify(c, os.Signal(29)) // syscall.SIGINFO doesn't exist in linux go.
 
   // TEST: Connect to other nodes
   for _, remoteAddr := range config.Nodes {
@@ -98,12 +98,12 @@ func main() {
   	select {
   		case sig := <-c:
         switch sig {
-          case syscall.SIGINFO:
-            logger.Info("Main", "Status: Node ID %02X", svr.ServerNode.ID)
-            logger.Info("Main", "Status: Listener Address %s", svr.Listener.Addr())
-            for _, peer := range svr.Connections { 
-              logger.Info("Main", "Status: Peer %02X (%s -> %s), %s", peer.ServerNetworkNode.ID, peer.Connection.LocalAddr(), peer.Connection.RemoteAddr(), network.PeerStateString[peer.State])
-            }
+          // case os.Signal(29):
+          //   logger.Info("Main", "Status: Node ID %02X", svr.ServerNode.ID)
+          //   logger.Info("Main", "Status: Listener Address %s", svr.Listener.Addr())
+          //   for _, peer := range svr.Connections { 
+          //     logger.Info("Main", "Status: Peer %02X (%s -> %s), %s", peer.ServerNetworkNode.ID, peer.Connection.LocalAddr(), peer.Connection.RemoteAddr(), network.PeerStateString[peer.State])
+          //   }
           case os.Interrupt:
             fallthrough
           case syscall.SIGTERM:
