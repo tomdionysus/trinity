@@ -16,6 +16,7 @@ type KVStorePacket struct {
   KVCommand int16
 
   Key string
+  KeyHash [16]byte
   Data []byte
   ExpiresAt time.Time
   Flags int16

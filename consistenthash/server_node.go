@@ -13,26 +13,26 @@ const(
   KEY_SIZE_BYTES = 16
 )
 
-type NodeDistribution [DISTRIBUTION_MAX]bt.ByteSliceKey
+type NodeDistribution [DISTRIBUTION_MAX]Key
 
 type ServerNetworkNode struct {
-  ID bt.ByteSliceKey
+  ID Key
   HostAddr string
   Distribution NodeDistribution
 }
 
 type ServerNode struct {
   ServerNetworkNode
-  NetworkNodes map[bt.ByteSliceKey]*ServerNetworkNode
+  NetworkNodes map[Key]*ServerNetworkNode
   Network *bt.Tree
 
-  Values map[bt.ByteSliceKey]string
+  Values map[Key]string
 }
 
 func NewServerNode(hostAddr string) *ServerNode {
   node := &ServerNode{ 
-    Values: map[bt.ByteSliceKey]string{},
-    NetworkNodes: map[bt.ByteSliceKey]*ServerNetworkNode{}, 
+    Values: map[Key]string{},
+    NetworkNodes: map[Key]*ServerNetworkNode{}, 
     Network: bt.NewTree(),
   }
   node.ID = RandKey()
@@ -50,13 +50,13 @@ func (me *ServerNode) Init() {
   }
 }
 
-func RandKey() bt.ByteSliceKey {
+func RandKey() Key {
   rand.Seed(time.Now().UTC().UnixNano())
   b := [16]byte{}
   for i:=0; i<16; i++ {
     b[i] = byte(rand.Intn(256))
   }
-  x := bt.ByteSliceKey(b)
+  x := Key(b)
   return x
 }
 
@@ -88,8 +88,8 @@ func (me *ServerNode) RemoveFromNetwork(server *ServerNetworkNode) error {
   return nil
 }
 
-func (me *ServerNode) GetNodeFor(key bt.ByteSliceKey) *ServerNetworkNode {
-  found, node := me.Network.Next(key)
+func (me *ServerNode) GetNodeFor(key Key) *ServerNetworkNode {
+  found, _, node := me.Network.Next(key)
   if !found { _, node = me.Network.First() }
   return node.(*ServerNetworkNode)
 }

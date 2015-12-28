@@ -2,6 +2,9 @@
 
 # Trinity DB
 
+[![Build Status](https://travis-ci.org/tomdionysus/trinity.svg)](https://travis-ci.org/tomdionysus/trinity)
+[![Coverage Status](https://coveralls.io/repos/tomdionysus/trinity/badge.svg?branch=master&service=github)](https://coveralls.io/github/tomdionysus/trinity?branch=master)
+
 Trinity is a concept project for a relational database, designed from the ground up as a cloud system.
 
 ## Status
