@@ -4,9 +4,9 @@
 
 ## Overview
 
-As of late Dec 2015, Trinity is pre-alpha. The basic node infrastructure is mostly in place, including the server binary, the TLS layer, the ability to listen for cluster connections and connect to other nodes. Nodes also notify connected nodes of new nodes, and swap consistent hash distributions and peer lists (CMD_DISTRIBUTION, CMD_PEERLIST), auto connnecting with new nodes supplied to them. There is also a single node Memcache server that supports a couple of the basic protocol commands (set with flags/expiry, get, delete). Data is stored on the appropriate node using consistent hashing.
+As of late Dec 2015, Trinity is pre-alpha. The basic node infrastructure is mostly in place, including the server binary, the TLS layer, the ability to listen for cluster connections and connect to other nodes. Nodes also notify connected nodes of new nodes, and swap consistent hash distributions and peer lists (CMD_DISTRIBUTION, CMD_PEERLIST), auto connnecting with new nodes supplied to them. There is also a Memcache interface that supports a couple of the basic protocol commands (set, get, delete). KV data is stored on the appropriate node using consistent hashing.
 
-This represents a large amount of work in creative mode, and the next phase of the project will be to refactor, consolidate, tighten up and generally improve the code quality and structure.
+This represents a large amount of work in creative mode, and the next phase of the project will be to refactor, consolidate, tighten up and generally improve the code quality and structure. Also, I might write some actual tests :)
 
 Next up, the KV data should replicate to the next 2 nodes on the circle. When a node joins, the other nodes should integrate its distribution into their circles in a 'syncing' (not readable) state and automatically copy the appropriate keys and values into the new node, calculating the new two recovery nodes and causing them to check that the appropriate keys and values exist, and sending delete notifications for each key to all other nodes.
 

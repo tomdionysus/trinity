@@ -50,16 +50,6 @@ func (me *ServerNode) Init() {
   }
 }
 
-func RandKey() Key {
-  rand.Seed(time.Now().UTC().UnixNano())
-  b := [16]byte{}
-  for i:=0; i<16; i++ {
-    b[i] = byte(rand.Intn(256))
-  }
-  x := Key(b)
-  return x
-}
-
 func (me *ServerNode) AddToNetwork(server *ServerNetworkNode) error {
   if server.ID == me.ID {
     return errors.New("Cannot register a node with itself")

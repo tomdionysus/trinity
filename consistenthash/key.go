@@ -3,6 +3,8 @@ package consistenthash
 import(
   "bytes"
   bt "github.com/tomdionysus/binarytree"
+  "time"
+  "math/rand"
 )
 
 type Key [16]byte
@@ -29,5 +31,15 @@ func (me Key) ValueOf() interface{} {
 func getSlice(t bt.Comparable) []byte {
   x := t.ValueOf().([16]byte)
   return x[:]
+}
+
+func RandKey() Key {
+  rand.Seed(time.Now().UTC().UnixNano())
+  b := [16]byte{}
+  for i:=0; i<16; i++ {
+    b[i] = byte(rand.Intn(256))
+  }
+  x := Key(b)
+  return x
 }
 

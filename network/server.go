@@ -50,7 +50,9 @@ func NewTLSServer(logger *util.Logger, caPool *CAPool, kvStore *kvstore.KVStore,
 		KVStore: kvStore,
 		CAPool: caPool,
 	}
-	inst.Logger.Debug("Server","Trinity Node ID %02X", inst.ServerNode.ID)
+	if inst.Logger!=nil { 
+		inst.Logger.Debug("Server","Trinity Node ID %02X", inst.ServerNode.ID)
+	}
 	return inst 
 }
 
