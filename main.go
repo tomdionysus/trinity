@@ -57,7 +57,8 @@ func main() {
 
 	// Server
 	svr := network.NewTLSServer(logger, capool, kv, *config.HostAddr)
-  
+  logger.Info("Main","Trinity Node ID %02X", svr.ServerNode.ID)
+
 	// Certificate
 	err = svr.LoadPEMCert(*config.Certificate, *config.Certificate)
 	if err != nil {

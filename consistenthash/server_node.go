@@ -25,17 +25,14 @@ type ServerNode struct {
   ServerNetworkNode
   NetworkNodes map[Key]*ServerNetworkNode
   Network *bt.Tree
-
-  Values map[Key]string
 }
 
 func NewServerNode(hostAddr string) *ServerNode {
   node := &ServerNode{ 
-    Values: map[Key]string{},
     NetworkNodes: map[Key]*ServerNetworkNode{}, 
     Network: bt.NewTree(),
   }
-  node.ID = RandKey()
+  node.ID = NewRandomKey()
   node.HostAddr = hostAddr
   node.Init()
   return node
@@ -45,7 +42,7 @@ func (me *ServerNode) Init() {
   me.Distribution = NodeDistribution{}
   for x:=0; x<DISTRIBUTION_MAX; x++ {
     rand.Seed(time.Now().UTC().UnixNano())
-    me.Distribution[x] = RandKey()
+    me.Distribution[x] = NewRandomKey()
     me.Network.Set(me.Distribution[x], &me.ServerNetworkNode)
   }
 }
@@ -65,13 +62,10 @@ func (me *ServerNode) AddToNetwork(server *ServerNetworkNode) error {
 }
 
 func (me *ServerNode) RemoveFromNetwork(server *ServerNetworkNode) error {
-  if server.ID == me.ID {
-    return errors.New("Cannot deregister a node with itself")
-  }
   if _, found := me.NetworkNodes[server.ID]; !found {
     return errors.New("Node is not registered")
   }
-  me.NetworkNodes[server.ID] = server
+  delete(me.NetworkNodes, server.ID)
   for _, x := range server.Distribution { me.Network.Clear(x);  }
 
   me.Network.Balance()

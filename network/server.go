@@ -4,7 +4,6 @@ import (
   "crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/md5"
 	"net"
 	"github.com/tomdionysus/trinity/util"
 	"github.com/tomdionysus/trinity/kvstore"
@@ -49,9 +48,6 @@ func NewTLSServer(logger *util.Logger, caPool *CAPool, kvStore *kvstore.KVStore,
 		SessionCache: tls.NewLRUClientSessionCache(1024),
 		KVStore: kvStore,
 		CAPool: caPool,
-	}
-	if inst.Logger!=nil { 
-		inst.Logger.Debug("Server","Trinity Node ID %02X", inst.ServerNode.ID)
 	}
 	return inst 
 }
@@ -133,7 +129,7 @@ func (me *TLSServer) NotifyNewPeer(newPeer *Peer) {
 // Distributed Key Value store methods
 
 func (me *TLSServer) SetKey(key string, value []byte, flags int16, expiry *time.Time) {
-	keymd5 := getMD5(key)
+	keymd5 := consistenthash.NewMD5Key(key)
 	node := me.ServerNode.GetNodeFor(keymd5)
 	if node.ID == me.ServerNode.ID {
 		me.Logger.Debug("Server","SetKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
@@ -157,7 +153,7 @@ func (me *TLSServer) SetKey(key string, value []byte, flags int16, expiry *time.
 }
 
 func (me *TLSServer) GetKey(key string) ([]byte, int16, bool) {
-	keymd5 := getMD5(key)
+	keymd5 := consistenthash.NewMD5Key(key)
 	node := me.ServerNode.GetNodeFor(keymd5)
 	if node.ID == me.ServerNode.ID {
 		me.Logger.Debug("Server","GetKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
@@ -197,7 +193,7 @@ func (me *TLSServer) GetKey(key string) ([]byte, int16, bool) {
 }
 
 func (me *TLSServer) DeleteKey(key string) bool {
-	keymd5 := getMD5(key)
+	keymd5 := consistenthash.NewMD5Key(key)
 	node := me.ServerNode.GetNodeFor(keymd5)
 	if node.ID == me.ServerNode.ID {
 		me.Logger.Debug("Server","DeleteKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
@@ -234,12 +230,6 @@ func (me *TLSServer) DeleteKey(key string) bool {
 	}
 	return false
 }
-
-func getMD5(keystring string) consistenthash.Key {
-	return consistenthash.Key(md5.Sum([]byte(keystring)))
-}
-
-// func (me *TLSServer) Broadcast()
 
 func (me *TLSServer) server_loop() {
 

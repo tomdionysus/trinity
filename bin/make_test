@@ -1,4 +1,15 @@
 #!/bin/bash
-go test \
- ./network \
--coverprofile=coverage/cover.out && go tool cover -html=coverage/cover.out -o coverage/index.html
+
+rm coverage/*
+# go test ./config -coverprofile=coverage/config.out 
+go test ./consistenthash -coverprofile=coverage/consistenthash.out 
+# go test ./kvstore -coverprofile=coverage/kvstore.out 
+# go test ./network -coverprofile=coverage/network.out 
+# go test ./packets -coverprofile=coverage/packets.out 
+# go test ./schema -coverprofile=coverage/schema.out 
+# go test ./sql -coverprofile=coverage/sql.out 
+# go test ./util -coverprofile=coverage/util.out 
+
+# cat coverage/*.out > coverage/cover.out
+
+go tool cover -html=coverage/consistenthash.out -o coverage/consistenthash.html

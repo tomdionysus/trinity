@@ -5,6 +5,7 @@ import(
   bt "github.com/tomdionysus/binarytree"
   "time"
   "math/rand"
+  "crypto/md5"
 )
 
 type Key [16]byte
@@ -33,7 +34,7 @@ func getSlice(t bt.Comparable) []byte {
   return x[:]
 }
 
-func RandKey() Key {
+func NewRandomKey() Key {
   rand.Seed(time.Now().UTC().UnixNano())
   b := [16]byte{}
   for i:=0; i<16; i++ {
@@ -41,5 +42,9 @@ func RandKey() Key {
   }
   x := Key(b)
   return x
+}
+
+func NewMD5Key(keystring string) Key {
+  return Key(md5.Sum([]byte(keystring)))
 }
 
