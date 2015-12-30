@@ -3,7 +3,7 @@ package network
 import ( 
   "github.com/tomdionysus/trinity/util"
   "github.com/tomdionysus/trinity/packets"
-  "github.com/tomdionysus/trinity/consistenthash"
+  "github.com/tomdionysus/consistenthash"
   "crypto/tls"
   "errors"
   // "bytes"

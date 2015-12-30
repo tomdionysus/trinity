@@ -2,7 +2,7 @@ package packets
 
 import (
   "time"
-  "github.com/tomdionysus/trinity/consistenthash"
+  "github.com/tomdionysus/consistenthash"
 )
 
 const(

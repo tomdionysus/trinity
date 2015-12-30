@@ -8,7 +8,7 @@ import (
 	"github.com/tomdionysus/trinity/util"
 	"github.com/tomdionysus/trinity/kvstore"
 	"github.com/tomdionysus/trinity/packets"
-	"github.com/tomdionysus/trinity/consistenthash"
+	"github.com/tomdionysus/consistenthash"
 	"fmt"
 	"encoding/gob"
 	"errors"
