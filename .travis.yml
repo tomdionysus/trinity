@@ -6,4 +6,5 @@ before_install:
   - go get github.com/stretchr/testify/assert
   - go get github.com/mattn/goveralls
 script:
-    - go test ./...
+  - go test ./...
+  - bin/make_cover --coveralls
