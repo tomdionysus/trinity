@@ -4,7 +4,7 @@
 
 * Distributed Architecture - no masters/replicas/slaves, read/write to any node
 * ANSI SQL92 compatible
-* Built-in fast, distrubuted Key-Value Store
+* Built-in fast, distributed Key-Value Store
 * Automatic replication and sharding
 * Distributed Queries 
 * Multi-mode consistency - per write, choose fire-and-forget, eventual, full

@@ -190,7 +190,7 @@ func (me *Peer) process() {
         servernetworknode := packet.Payload.(consistenthash.ServerNetworkNode)
         me.ServerNetworkNode = &servernetworknode
         me.Server.Connections[me.ServerNetworkNode.ID] = me
-        err := me.Server.ServerNode.AddToNetwork(me.ServerNetworkNode)
+        err := me.Server.ServerNode.RegisterNode(me.ServerNetworkNode)
         if err!=nil {
           me.Logger.Error("Peer","Adding Node ID %02x Failed: %s", me.ServerNetworkNode.ID, err.Error())
         }
