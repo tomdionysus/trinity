@@ -1,7 +1,7 @@
 #!/bin/bash
 
 rm coverage/*
-# go test ./config -coverprofile=coverage/config.out 
+go test ./config -coverprofile=coverage/config.out 
 go test ./consistenthash -coverprofile=coverage/consistenthash.out 
 # go test ./kvstore -coverprofile=coverage/kvstore.out 
 # go test ./network -coverprofile=coverage/network.out 

@@ -6,8 +6,6 @@ import(
   "errors"
 )
 
-type NodeURLs []string
-
 type Config struct {
   Nodes NodeURLs
   CA *string
@@ -19,20 +17,12 @@ type Config struct {
   HostAddr *string
 }
 
-func (me *NodeURLs) Set(value string) (error) {
-  *me = append(*me, value)
-  return nil
-}
-
-func (i *NodeURLs) String() string {
-  return fmt.Sprint(*i)
-}
-
 func NewConfig() *Config {
   inst := &Config{}
+
   flag.Var(&inst.Nodes, "node", "URL of another trinity node")
-  inst.Certificate = flag.String("cert", "", "Certificate PEM file")
-  inst.CA = flag.String("ca", "", "CA PEM file")
+  inst.CA = flag.String("ca", "ca.pem", "CA PEM file")
+  inst.Certificate = flag.String("cert", "cert.pem", "Certificate PEM file")
   inst.LogLevel = flag.String("loglevel", "error", "Logging Level [error,warn,info,debug]")
   inst.Port = flag.Int("port", 13531, "Cluster port")
   inst.MemcacheEnabled = flag.Bool("memcache", false, "Enable Memcache Server")
