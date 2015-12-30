@@ -2,8 +2,7 @@ package packets
 
 import (
   "time"
-  // "encoding/gob"
-  "github.com/tomdionysus/trinity/util"
+  "github.com/tomdionysus/trinity/consistenthash"
 )
 
 const(
@@ -24,7 +23,7 @@ type Packet struct {
 func NewPacket(command uint16, payload interface{}) *Packet {
   inst := &Packet{
     Command: command,
-    ID: util.GetRandomID(),
+    ID: consistenthash.NewRandomKey(),
     Sent: time.Now(),
     Payload: payload,
   }
@@ -34,7 +33,7 @@ func NewPacket(command uint16, payload interface{}) *Packet {
 func NewResponsePacket(command uint16, requestid [16]byte, payload interface{}) *Packet {
   inst := &Packet{
     Command: command,
-    ID: util.GetRandomID(),
+    ID: [16]byte(consistenthash.NewRandomKey()),
     RequestID: requestid,
     Sent: time.Now(),
     Payload: payload,
