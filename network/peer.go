@@ -16,6 +16,7 @@ const (
   PeerStateConnecting = iota
   PeerStateHandshake = iota
   PeerStateConnected = iota
+  PeerStateSyncing = iota
   PeerStateDefib = iota
 )
 
@@ -24,6 +25,7 @@ var PeerStateString map[uint]string = map[uint]string{
   PeerStateConnecting: "PeerStateConnecting",
   PeerStateHandshake: "PeerStateHandshake",
   PeerStateConnected: "PeerStateConnected",
+  PeerStateSyncing: "PeerStateSyncing",
   PeerStateDefib: "PeerStateDefib",
 }
 
@@ -93,6 +95,7 @@ func (me *Peer) Connect() error {
 func (me *Peer) Disconnect() {
   if me.State == PeerStateConnected {
     me.State = PeerStateDisconnected
+    me.Server.ServerNode.DeregisterNode(me.ServerNetworkNode)
     if me.Connection!=nil { me.Connection.Close() }
     if me.HeartbeatTicker!=nil { me.HeartbeatTicker.Stop() }
     me.Logger.Info("Peer", "Disconnected: %s", me.Connection.RemoteAddr())
@@ -263,6 +266,11 @@ func (me *Peer) SendPacket(packet *packets.Packet) error {
 }
 
 func (me *Peer) SendPacketWaitReply(packet *packets.Packet, timeout time.Duration) (*packets.Packet, error) {
+  if me.State != PeerStateConnected {
+    me.Logger.Error("Peer", "%s: Cannot send packet ID %02X, not PeerStateConnected", me.Connection.RemoteAddr(), packet.ID)
+    return nil, errors.New("Cannot send, state not PeerStateConnected")
+  }
+
   me.Replies[packet.ID] = make(chan(*packets.Packet))
   me.SendPacket(packet)
   reply := <- me.Replies[packet.ID]

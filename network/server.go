@@ -130,63 +130,81 @@ func (me *TLSServer) NotifyNewPeer(newPeer *Peer) {
 
 func (me *TLSServer) SetKey(key string, value []byte, flags int16, expiry *time.Time) {
 	keymd5 := consistenthash.NewMD5Key(key)
-	node := me.ServerNode.GetNodeFor(keymd5)
-	if node.ID == me.ServerNode.ID {
-		me.Logger.Debug("Server","SetKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
-		// Local set.
-		me.KVStore.Set(key, value, flags, expiry)
-	} else {
-		me.Logger.Debug("Server","SetKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
-		// Remote Set.
-		payload := packets.KVStorePacket{
-			Command: packets.CMD_KVSTORE_SET,
-			Key: key,
-			KeyHash: keymd5,
-			Data: value,
-			ExpiresAt: expiry,
-			Flags: flags,
-			TargetID: node.ID,
+	nodes := me.ServerNode.GetNodesFor(keymd5, 3)
+	me.Logger.Debug("Server","SetKey: %d peers for key %02X", len(nodes), keymd5)
+	for _, node := range nodes {
+		if node.ID == me.ServerNode.ID {
+			me.Logger.Debug("Server","SetKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
+			// Local set.
+			me.KVStore.Set(key, value, flags, expiry)
+		} else {
+			me.Logger.Debug("Server","SetKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
+			
+			peer := me.Connections[node.ID]
+			if peer.State != PeerStateConnected {				
+				me.Logger.Warn("Server","SetKey: Peer for key %02X -> %02X (Remote) Unavailable", keymd5, node.ID)
+				continue
+			}
+			// Remote Set.
+			payload := packets.KVStorePacket{
+				Command: packets.CMD_KVSTORE_SET,
+				Key: key,
+				KeyHash: keymd5,
+				Data: value,
+				ExpiresAt: expiry,
+				Flags: flags,
+				TargetID: node.ID,
+			}
+			packet := packets.NewPacket(packets.CMD_KVSTORE, payload)
+			peer.SendPacketWaitReply(packet, 0)
 		}
-		packet := packets.NewPacket(packets.CMD_KVSTORE, payload)
-		me.Connections[node.ID].SendPacketWaitReply(packet, 0)
 	}
 }
 
 func (me *TLSServer) GetKey(key string) ([]byte, int16, bool) {
 	keymd5 := consistenthash.NewMD5Key(key)
-	node := me.ServerNode.GetNodeFor(keymd5)
-	if node.ID == me.ServerNode.ID {
-		me.Logger.Debug("Server","GetKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
-		// Local set.
-		return me.KVStore.Get(key)
-	} else {
-		me.Logger.Debug("Server","GetKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
-		// Remote Set.
-		payload := packets.KVStorePacket{
-			Command: packets.CMD_KVSTORE_GET,
-			Key: key,
-			KeyHash: keymd5,
-			TargetID: node.ID,
-		}
-		packet := packets.NewPacket(packets.CMD_KVSTORE, payload)
-		reply, err := me.Connections[node.ID].SendPacketWaitReply(packet, 0)
-		
-		// Process reply or timeout
-		if err==nil {
-			switch reply.Command {
-			case packets.CMD_KVSTORE_ACK:
-				kvpacket := reply.Payload.(packets.KVStorePacket)
-				me.Logger.Debug("Server","GetKey: Reply from Remote %s = %s", key, kvpacket.Data)
-				return kvpacket.Data, kvpacket.Flags, true
-			case packets.CMD_KVSTORE_NOT_FOUND:
-				me.Logger.Debug("Server","GetKey: Reply from Remote %s Not Found", key)
-				return []byte{}, 0, false
-			default:
-				me.Logger.Warn("Server","GetKey: Unknown Reply Command %d", reply.Command)
-			}
+	nodes := me.ServerNode.GetNodesFor(keymd5, 3)
+	for _, node := range nodes {
+		if node.ID == me.ServerNode.ID {
+			me.Logger.Debug("Server","GetKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
+			// Local set.
+			return me.KVStore.Get(key)
 		} else {
-			me.Logger.Warn("Server","GetKey: Reply Timeout")
-			// TODO: Timeout
+			me.Logger.Debug("Server","GetKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
+
+			peer := me.Connections[node.ID]
+			if peer.State != PeerStateConnected {				
+				me.Logger.Warn("Server","GetKey: Peer for key %02X -> %02X (Remote) Unavailable", keymd5, node.ID)
+				continue
+			}
+
+			// Remote Set.
+			payload := packets.KVStorePacket{
+				Command: packets.CMD_KVSTORE_GET,
+				Key: key,
+				KeyHash: keymd5,
+				TargetID: node.ID,
+			}
+			packet := packets.NewPacket(packets.CMD_KVSTORE, payload)
+			reply, err := peer.SendPacketWaitReply(packet, 0)
+			
+			// Process reply or timeout
+			if err==nil {
+				switch reply.Command {
+				case packets.CMD_KVSTORE_ACK:
+					kvpacket := reply.Payload.(packets.KVStorePacket)
+					me.Logger.Debug("Server","GetKey: Reply from Remote %s = %s", key, kvpacket.Data)
+					return kvpacket.Data, kvpacket.Flags, true
+				case packets.CMD_KVSTORE_NOT_FOUND:
+					me.Logger.Debug("Server","GetKey: Reply from Remote %s Not Found", key)
+					return []byte{}, 0, false
+				default:
+					me.Logger.Warn("Server","GetKey: Unknown Reply Command %d", reply.Command)
+				}
+			} else {
+				me.Logger.Warn("Server","GetKey: Reply Timeout")
+				// TODO: Timeout
+			}
 		}
 	}
 	return []byte{}, 0, false
