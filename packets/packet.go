@@ -8,7 +8,6 @@ import (
 const(
   CMD_HEARTBEAT = 1
   CMD_DISTRIBUTION = 2
-  CMD_PEERLIST = 3
 )
 
 type Packet struct {

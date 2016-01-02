@@ -108,20 +108,18 @@ func (me *TLSServer) Stop() {
 	me.ControlChannel <- CmdStop
 }
 
-func (me *TLSServer) IsConnectedTo(remoteAddr string) bool {
-	for _, peer := range me.Connections {
-		if remoteAddr == peer.ServerNetworkNode.HostAddr { return true }
-		if remoteAddr == peer.Connection.RemoteAddr().String() { return true }
-	}
-	return false
+func (me *TLSServer) IsConnectedTo(id consistenthash.Key) bool {
+	_, found := me.Connections[id]
+	return found
 }
 
 func (me *TLSServer) NotifyNewPeer(newPeer *Peer) {
-	me.Logger.Info("Server","Notifying Existing Peers of new Peer %02X (%s)", newPeer.ServerNetworkNode.ID, newPeer.ServerNetworkNode.HostAddr)
-	for _, peer := range me.Connections { 
+	for id, peer := range me.Connections { 
 		if peer.ServerNetworkNode.ID != newPeer.ServerNetworkNode.ID {
-			packet := packets.NewPacket(packets.CMD_PEERLIST, []string{ newPeer.ServerNetworkNode.HostAddr })
-			peer.SendPacket(packet)
+			me.Logger.Info("Server","Notifying Existing Peer %02X of new Peer %02X (%s)", id, newPeer.ServerNetworkNode.ID, newPeer.ServerNetworkNode.HostAddr)
+			payload :=packets.PeerListPacket{}
+			payload[newPeer.ServerNetworkNode.ID] = newPeer.ServerNetworkNode.HostAddr
+			peer.SendPacket(packets.NewPacket(packets.CMD_PEERLIST, payload))
 		}
 	}
 }
@@ -270,7 +268,7 @@ func (me *TLSServer) server_loop() {
 		select {
 			case cmd := <- me.ControlChannel:
 				if cmd == CmdStop {
-					me.Logger.Debug("Server","Stop Recieved, Shutting Down")
+					me.Logger.Debug("Server","Stop Received, Shutting Down")
 					goto end
 				}
 		}
@@ -278,9 +276,9 @@ func (me *TLSServer) server_loop() {
 	
 	end:
 
-	for _, Peer := range me.Connections {
-		me.Logger.Debug("Server","Closing Connection %s", Peer.Connection.RemoteAddr())
-		Peer.Disconnect()
+	me.Logger.Debug("Server","Closing Peer Connections")
+	for _, peer := range me.Connections {
+		peer.Disconnect()
 	}
 
 	me.Logger.Info("Server","Stopped")

@@ -58,7 +58,7 @@ trinity-server --ca=<CA_PEM> --cert=<CERT_PEM> [other flags]
 
 * [github.com/tomdionysus/binarytree](https://github.com/tomdionysus/binarytree)
 * [github.com/tomdionysus/bplustree](https://github.com/tomdionysus/bplustree)
-* [github.com/tomdionysus/consistenthash](https://github.com/tomdionysus/bplustree)
+* [github.com/tomdionysus/consistenthash](https://github.com/tomdionysus/consistenthash)
 
 ## References
 

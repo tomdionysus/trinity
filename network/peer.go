@@ -32,6 +32,8 @@ var PeerStateString map[uint]string = map[uint]string{
 type Peer struct {
   Logger *util.Logger
   Server *TLSServer
+
+  Incoming bool
   
   Address string
   State uint
@@ -66,10 +68,12 @@ func NewConnectingPeer(logger *util.Logger, server *TLSServer, connection *tls.C
   inst := NewPeer(logger, server, connection.RemoteAddr().String())
   inst.Connection = connection
   inst.State = PeerStateHandshake
+  inst.Incoming = true
   return inst
 }
 
 func (me *Peer) Connect() error {
+  me.Incoming = false
   me.State = PeerStateConnecting
   conn, err := tls.Dial("tcp", me.Address, &tls.Config{
     RootCAs: me.Server.CAPool.Pool,
@@ -98,7 +102,7 @@ func (me *Peer) Disconnect() {
     me.Server.ServerNode.DeregisterNode(me.ServerNetworkNode)
     if me.Connection!=nil { me.Connection.Close() }
     if me.HeartbeatTicker!=nil { me.HeartbeatTicker.Stop() }
-    me.Logger.Info("Peer", "Disconnected: %s", me.Connection.RemoteAddr())
+    me.Logger.Info("Peer", "%02X: Disconnected", me.ServerNetworkNode.ID)
     delete(me.Server.Connections, me.ServerNetworkNode.ID)
   }
 }
@@ -122,7 +126,6 @@ func (me *Peer) Start() error {
   }
   sub := state.PeerCertificates[0].Subject.CommonName
   me.Logger.Info("Peer", "Connected to %s (%s) [%s]", me.Connection.RemoteAddr(), sub, Ciphers[me.Connection.ConnectionState().CipherSuite])
-  me.State = PeerStateConnected
 
   me.Reader = gob.NewDecoder(me.Connection)
   me.Writer = gob.NewEncoder(me.Connection)
@@ -130,7 +133,6 @@ func (me *Peer) Start() error {
   go me.heartbeat()
 
   me.SendDistribution()
-  me.SendPeerlist()
 
   go me.process()
 
@@ -146,7 +148,7 @@ func (me *Peer) heartbeat() {
 
     // Check For Defib
     if time.Now().After(me.LastHeartbeat.Add(5 * time.Second)) {
-      me.Logger.Warn("Peer", "%s: Peer Defib (no response for 5 seconds)", me.Connection.RemoteAddr())
+      me.Logger.Warn("Peer", "%02X: Peer Defib (no response for 5 seconds)", me.ServerNetworkNode.ID)
       me.State = PeerStateDefib
     }
 
@@ -154,13 +156,13 @@ func (me *Peer) heartbeat() {
       case PeerStateConnected:
         err := me.SendPacket(packets.NewPacket(packets.CMD_HEARTBEAT,nil))
         if err!=nil {
-          me.Logger.Error("Peer","Error Sending Heartbeat, disconnecting", me.Connection.RemoteAddr())
+          me.Logger.Error("Peer","Error Sending Heartbeat, disconnecting", me.ServerNetworkNode.ID)
           me.Disconnect()
           return
         }
       case PeerStateDefib:
         if time.Now().After(me.LastHeartbeat.Add(10 * time.Second)) {
-          me.Logger.Warn("Peer", "%s: Peer DOA (Defib for 5 seconds, disconnecting)", me.Connection.RemoteAddr())
+          me.Logger.Warn("Peer", "%02X: Peer DOA (Defib for 5 seconds, disconnecting)", me.ServerNetworkNode.ID)
           me.Disconnect()
           return
         }
@@ -179,51 +181,67 @@ func (me *Peer) process() {
     err := me.Reader.Decode(&packet)
     if err!=nil {
       if err.Error()=="EOF" {
-        me.Logger.Debug("Peer", "%s: Peer Closed Connection", me.Connection.RemoteAddr())
+        me.Logger.Debug("Peer", "%02X: Peer Closed Connection", me.ServerNetworkNode.ID)
       } else {
-        me.Logger.Error("Peer", "%s: Error Reading: %s", me.Connection.RemoteAddr(), err.Error())
+        me.Logger.Error("Peer", "%02X: Error Reading: %s", me.ServerNetworkNode.ID, err.Error())
       }
       goto end
     }
     switch (packet.Command) {
+
+      // Packets in Connecting / Handshake
+
       case packets.CMD_HEARTBEAT:
         me.LastHeartbeat = time.Now()
       case packets.CMD_DISTRIBUTION:
-        me.Logger.Debug("Peer", "%s: CMD_DISTRIBUTION", me.Connection.RemoteAddr())
+        me.Logger.Debug("Peer", "Received from %s: CMD_DISTRIBUTION", me.Connection.RemoteAddr())
+        if me.ServerNetworkNode!=nil {
+          me.Logger.Warn("Peer", "%02X: Already received CMD_DISTRIBUTION from peer previously", me.ServerNetworkNode.ID)
+          break
+        }
         servernetworknode := packet.Payload.(consistenthash.ServerNetworkNode)
         me.ServerNetworkNode = &servernetworknode
         me.Server.Connections[me.ServerNetworkNode.ID] = me
-        err := me.Server.ServerNode.RegisterNode(me.ServerNetworkNode)
+        redistribution, err := me.Server.ServerNode.RegisterNode(me.ServerNetworkNode)
+        me.State = PeerStateConnected
         if err!=nil {
           me.Logger.Error("Peer","Adding Node ID %02x Failed: %s", me.ServerNetworkNode.ID, err.Error())
+          break
+        }
+        if len(redistribution) > 0 {
+          // for _, redist := range redistribution {
+          //   me.Logger.Debug("Peer","Redistribution: %02x - %02x :  %02X -> %02X", redist.Start, redist.End, redist.SourceNodeID, redist.DestinationNodeID)
+          // }
         }
         me.Server.NotifyNewPeer(me)
+      // Packets in Connected
+
       case packets.CMD_KVSTORE:
-        me.Logger.Debug("Peer", "%s: CMD_KVSTORE", me.Connection.RemoteAddr())
+        me.Logger.Debug("Peer", "%02X: CMD_KVSTORE", me.ServerNetworkNode.ID)
         me.handleKVStorePacket(&packet)
       case packets.CMD_KVSTORE_ACK:
-        me.Logger.Debug("Peer", "%s: CMD_KVSTORE_ACK", me.Connection.RemoteAddr())
+        me.Logger.Debug("Peer", "%02X: CMD_KVSTORE_ACK", me.ServerNetworkNode.ID)
         me.handleReply(&packet)
       case packets.CMD_KVSTORE_NOT_FOUND:
-        me.Logger.Debug("Peer", "%s: CMD_KVSTORE_NOT_FOUND", me.Connection.RemoteAddr())
+        me.Logger.Debug("Peer", "%02X: CMD_KVSTORE_NOT_FOUND", me.ServerNetworkNode.ID)
         me.handleReply(&packet)
       case packets.CMD_PEERLIST:
-        peers := packet.Payload.([]string)
-        me.Logger.Debug("Peer", "%s: CMD_PEERLIST (%d Peers)", me.Connection.RemoteAddr(), len(peers))
-        for _, k := range peers {
+        peers := packet.Payload.(packets.PeerListPacket)
+        me.Logger.Debug("Peer", "%02X: CMD_PEERLIST (%d Peers)", me.ServerNetworkNode.ID, len(peers))
+        for id, k := range peers {
           if me.Server.Listener.Addr().String() == k {
-            me.Logger.Error("Peer", "%s: - Peer %s us of ourselves.", me.Connection.RemoteAddr(), k)       
+            me.Logger.Error("Peer", "%02X: - Peer %s us of ourselves.", me.ServerNetworkNode.ID, k)       
           } else {
-            if !me.Server.IsConnectedTo(k)  {
-              me.Logger.Debug("Peer", "%s: - Connecting New Peer %s", me.Connection.RemoteAddr(), k)
+            if !me.Server.IsConnectedTo(id)  {
+              me.Logger.Debug("Peer", "%02X: - Connecting New Peer %s", me.ServerNetworkNode.ID, k)
               me.Server.ConnectTo(k)
             } else {
-              me.Logger.Debug("Peer", "%s: - Already Connected to Peer %s", me.Connection.RemoteAddr(), k)
+              me.Logger.Debug("Peer", "%02X: - Already Connected to Peer %s", me.ServerNetworkNode.ID, k)
             }
           }
         }
       default:
-        me.Logger.Warn("Peer", "%s: Unknown Packet Command %d", me.Connection.RemoteAddr(), packet.Command)
+        me.Logger.Warn("Peer", "%02X: Unknown Packet Command %d", me.ServerNetworkNode.ID, packet.Command)
     }
   }
   end:
@@ -237,18 +255,8 @@ func (me *Peer) handleReply(packet *packets.Packet) {
     delete(me.Replies, packet.RequestID)
     chn <- packet
   } else {
-    me.Logger.Warn("Peer", "%s: Unsolicited Reply to unknown packet %02X", me.Connection.RemoteAddr(), packet.RequestID)
+    me.Logger.Warn("Peer", "%02X: Unsolicited Reply to unknown packet %02X", me.ServerNetworkNode.ID, packet.RequestID)
   }
-}
-
-func (me *Peer) SendPeerlist() error {
-  peers := []string{}
-  for _, peer := range me.Server.Connections { 
-    if peer.ServerNetworkNode!=nil && peer.ServerNetworkNode.ID != me.Server.ServerNode.ID { peers = append(peers, peer.ServerNetworkNode.HostAddr) }
-  }
-  packet := packets.NewPacket(packets.CMD_PEERLIST, peers)
-  me.SendPacket(packet)
-  return nil
 }
 
 func (me *Peer) SendDistribution() error {
@@ -267,14 +275,14 @@ func (me *Peer) SendPacket(packet *packets.Packet) error {
 
 func (me *Peer) SendPacketWaitReply(packet *packets.Packet, timeout time.Duration) (*packets.Packet, error) {
   if me.State != PeerStateConnected {
-    me.Logger.Error("Peer", "%s: Cannot send packet ID %02X, not PeerStateConnected", me.Connection.RemoteAddr(), packet.ID)
+    me.Logger.Error("Peer", "%02X: Cannot send packet ID %02X, not PeerStateConnected", me.ServerNetworkNode.ID, packet.ID)
     return nil, errors.New("Cannot send, state not PeerStateConnected")
   }
 
   me.Replies[packet.ID] = make(chan(*packets.Packet))
   me.SendPacket(packet)
   reply := <- me.Replies[packet.ID]
-  me.Logger.Debug("Peer", "%s: Got Reply %02X for packet ID %02X", me.Connection.RemoteAddr(), reply.ID, packet.ID)
+  me.Logger.Debug("Peer", "%02X: Got Reply %02X for packet ID %02X", me.ServerNetworkNode.ID, reply.ID, packet.ID)
   return reply, nil
 }
 
@@ -293,7 +301,7 @@ func (me *Peer) handleKVStorePacket(packet *packets.Packet) {
 }
 
 func (me *Peer) handleKVStoreSet(packet *packets.KVStorePacket, request *packets.Packet) {
-  me.Logger.Debug("Peer", "%s: KVStoreSet: %s = %s", me.Connection.RemoteAddr(), packet.Key, packet.Data)
+  me.Logger.Debug("Peer", "%02X: KVStoreSet: %s = %s", me.ServerNetworkNode.ID, packet.Key, packet.Data)
   me.Server.KVStore.Set(
     packet.Key,
     packet.Data,
@@ -301,12 +309,12 @@ func (me *Peer) handleKVStoreSet(packet *packets.KVStorePacket, request *packets
     packet.ExpiresAt)
 
   response := packets.NewResponsePacket(packets.CMD_KVSTORE_ACK, request.ID, packet.Key)
-    me.Logger.Debug("Peer", "%s: KVStoreSet: %s Acknowledge, replying", me.Connection.RemoteAddr(), packet.Key)
+    me.Logger.Debug("Peer", "%02X: KVStoreSet: %s Acknowledge, replying", me.ServerNetworkNode.ID, packet.Key)
   me.SendPacket(response)
 }
 
 func (me *Peer) handleKVStoreGet(packet *packets.KVStorePacket, request *packets.Packet) {
-  me.Logger.Debug("Peer", "%s: KVStoreGet: %s", me.Connection.RemoteAddr(), packet.Key)
+  me.Logger.Debug("Peer", "%02X: KVStoreGet: %s", me.ServerNetworkNode.ID, packet.Key)
   value, flags, found := me.Server.KVStore.Get(packet.Key)
 
   var response *packets.Packet
@@ -319,27 +327,27 @@ func (me *Peer) handleKVStoreGet(packet *packets.KVStorePacket, request *packets
       Flags: flags,
     }
     response = packets.NewResponsePacket(packets.CMD_KVSTORE_ACK, request.ID, payload)
-    me.Logger.Debug("Peer", "%s: KVStoreGet: %s = %s, replying", me.Connection.RemoteAddr(), packet.Key, value)
+    me.Logger.Debug("Peer", "%02X: KVStoreGet: %s = %s, replying", me.ServerNetworkNode.ID, packet.Key, value)
   } else {
     response = packets.NewResponsePacket(packets.CMD_KVSTORE_NOT_FOUND, request.ID, packet.Key)
-    me.Logger.Debug("Peer", "%s: KVStoreGet: %s Not found, replying", me.Connection.RemoteAddr(), packet.Key)
+    me.Logger.Debug("Peer", "%02X: KVStoreGet: %s Not found, replying", me.ServerNetworkNode.ID, packet.Key)
   }
 
   me.SendPacket(response)
 }
 
 func (me *Peer) handleKVStoreDelete(packet *packets.KVStorePacket, request *packets.Packet) {
-  me.Logger.Debug("Peer", "%s: KVStoreDelete: %s", me.Connection.RemoteAddr(), packet.Key)
+  me.Logger.Debug("Peer", "%02X: KVStoreDelete: %s", me.ServerNetworkNode.ID, packet.Key)
   found := me.Server.KVStore.Delete(packet.Key)
   
   var response *packets.Packet
 
   if found {
     response = packets.NewResponsePacket(packets.CMD_KVSTORE_ACK, request.ID, packet.Key)
-    me.Logger.Debug("Peer", "%s: KVStoreDelete: %s Deleted, replying", me.Connection.RemoteAddr(), packet.Key)
+    me.Logger.Debug("Peer", "%02X: KVStoreDelete: %s Deleted, replying", me.ServerNetworkNode.ID, packet.Key)
   } else {
     response = packets.NewResponsePacket(packets.CMD_KVSTORE_NOT_FOUND, request.ID, packet.Key)
-    me.Logger.Debug("Peer", "%s: KVStoreDelete: %s Not found, replying", me.Connection.RemoteAddr(), packet.Key)
+    me.Logger.Debug("Peer", "%02X: KVStoreDelete: %s Not found, replying", me.ServerNetworkNode.ID, packet.Key)
   }
 
   me.SendPacket(response)
