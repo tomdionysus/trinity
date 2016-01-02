@@ -148,7 +148,7 @@ func (me *Peer) heartbeat() {
 
     // Check For Defib
     if time.Now().After(me.LastHeartbeat.Add(5 * time.Second)) {
-      me.Logger.Warn("Peer", "%02X: Peer Defib (no response for 5 seconds)", me.ServerNetworkNode.ID)
+      me.Logger.Warn("Peer", "%02X: Peer Defib (no response for >5 seconds)", me.ServerNetworkNode.ID)
       me.State = PeerStateDefib
     }
 
@@ -156,7 +156,7 @@ func (me *Peer) heartbeat() {
       case PeerStateConnected:
         err := me.SendPacket(packets.NewPacket(packets.CMD_HEARTBEAT,nil))
         if err!=nil {
-          me.Logger.Error("Peer","Error Sending Heartbeat, disconnecting", me.ServerNetworkNode.ID)
+          me.Logger.Error("Peer", "%02X: Error Sending Heartbeat, disconnecting", me.ServerNetworkNode.ID)
           me.Disconnect()
           return
         }
@@ -205,7 +205,7 @@ func (me *Peer) process() {
         redistribution, err := me.Server.ServerNode.RegisterNode(me.ServerNetworkNode)
         me.State = PeerStateConnected
         if err!=nil {
-          me.Logger.Error("Peer","Adding Node ID %02x Failed: %s", me.ServerNetworkNode.ID, err.Error())
+          me.Logger.Error("Peer","%02X: Register Node Distribution Failed: %s", me.ServerNetworkNode.ID, err.Error())
           break
         }
         if len(redistribution) > 0 {
