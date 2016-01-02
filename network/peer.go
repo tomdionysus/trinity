@@ -100,10 +100,10 @@ func (me *Peer) Disconnect() {
   if me.State == PeerStateConnected {
     me.State = PeerStateDisconnected
     me.Server.ServerNode.DeregisterNode(me.ServerNetworkNode)
-    if me.Connection!=nil { me.Connection.Close() }
     if me.HeartbeatTicker!=nil { me.HeartbeatTicker.Stop() }
-    me.Logger.Info("Peer", "%02X: Disconnected", me.ServerNetworkNode.ID)
+    if me.Connection!=nil { me.Connection.Close() }
     delete(me.Server.Connections, me.ServerNetworkNode.ID)
+    me.Logger.Info("Peer", "%02X: Disconnected", me.ServerNetworkNode.ID)
   }
 }
 
@@ -194,14 +194,14 @@ func (me *Peer) process() {
       case packets.CMD_HEARTBEAT:
         me.LastHeartbeat = time.Now()
       case packets.CMD_DISTRIBUTION:
-        me.Logger.Debug("Peer", "Received from %s: CMD_DISTRIBUTION", me.Connection.RemoteAddr())
         if me.ServerNetworkNode!=nil {
-          me.Logger.Warn("Peer", "%02X: Already received CMD_DISTRIBUTION from peer previously", me.ServerNetworkNode.ID)
+          me.Logger.Warn("Peer", "%02X: CMD_DISTRIBUTION received from registered peer", me.ServerNetworkNode.ID)
           break
-        }
+        } 
         servernetworknode := packet.Payload.(consistenthash.ServerNetworkNode)
         me.ServerNetworkNode = &servernetworknode
         me.Server.Connections[me.ServerNetworkNode.ID] = me
+        me.Logger.Debug("Peer", "%02X: CMD_DISTRIBUTION (%s)", me.ServerNetworkNode.ID, me.Connection.RemoteAddr())
         redistribution, err := me.Server.ServerNode.RegisterNode(me.ServerNetworkNode)
         me.State = PeerStateConnected
         if err!=nil {
@@ -230,13 +230,13 @@ func (me *Peer) process() {
         me.Logger.Debug("Peer", "%02X: CMD_PEERLIST (%d Peers)", me.ServerNetworkNode.ID, len(peers))
         for id, k := range peers {
           if me.Server.Listener.Addr().String() == k {
-            me.Logger.Error("Peer", "%02X: - Peer %s us of ourselves.", me.ServerNetworkNode.ID, k)       
+            me.Logger.Warn("Peer", "%02X: - Peer %02X (%s) notified us of ourselves.", id, me.ServerNetworkNode.ID, k)       
           } else {
             if !me.Server.IsConnectedTo(id)  {
-              me.Logger.Debug("Peer", "%02X: - Connecting New Peer %s", me.ServerNetworkNode.ID, k)
+              me.Logger.Debug("Peer", "%02X: - Connecting New Peer %02X (%s)", id, me.ServerNetworkNode.ID, k)
               me.Server.ConnectTo(k)
             } else {
-              me.Logger.Debug("Peer", "%02X: - Already Connected to Peer %s", me.ServerNetworkNode.ID, k)
+              me.Logger.Debug("Peer", "%02X: - Already Connected to Peer %02X (%s)", id, me.ServerNetworkNode.ID, k)
             }
           }
         }

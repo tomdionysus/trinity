@@ -48,7 +48,8 @@ func (me *MemcacheServer) Start() error {
       // Wait for a connection.
       conn, err := listener.Accept()
       if err != nil {
-        me.Logger.Info("Memcache","Incoming Connection Failed: %s",err.Error())
+        me.Logger.Info("Memcache","Closed Listener")
+        break
       } else {
         addr := conn.RemoteAddr().String()
         me.Logger.Info("Memcache","Incoming Connection from [%s]",addr)

@@ -115,7 +115,7 @@ func (me *TLSServer) IsConnectedTo(id consistenthash.Key) bool {
 
 func (me *TLSServer) NotifyNewPeer(newPeer *Peer) {
 	for id, peer := range me.Connections { 
-		if peer.ServerNetworkNode.ID != newPeer.ServerNetworkNode.ID {
+		if peer.ServerNetworkNode.ID != newPeer.ServerNetworkNode.ID && peer.Incoming {
 			me.Logger.Info("Server","Notifying Existing Peer %02X of new Peer %02X (%s)", id, newPeer.ServerNetworkNode.ID, newPeer.ServerNetworkNode.HostAddr)
 			payload :=packets.PeerListPacket{}
 			payload[newPeer.ServerNetworkNode.ID] = newPeer.ServerNetworkNode.HostAddr
