@@ -280,10 +280,18 @@ func (me *Peer) SendPacketWaitReply(packet *packets.Packet, timeout time.Duratio
   }
 
   me.Replies[packet.ID] = make(chan(*packets.Packet))
+  ticker := time.NewTicker(timeout)
   me.SendPacket(packet)
-  reply := <- me.Replies[packet.ID]
-  me.Logger.Debug("Peer", "%02X: Got Reply %02X for packet ID %02X", me.ServerNetworkNode.ID, reply.ID, packet.ID)
-  return reply, nil
+  var reply *packets.Packet
+  select {
+    case reply = <- me.Replies[packet.ID]:
+      me.Logger.Debug("Peer", "%02X: Got Reply %02X for packet ID %02X", me.ServerNetworkNode.ID, reply.ID, packet.ID)
+      ticker.Stop()
+      return reply, nil
+    case <- ticker.C:
+      me.Logger.Warn("Peer", "%02X: Reply Timeout for packet ID %02X", me.ServerNetworkNode.ID, packet.ID)
+      return nil, errors.New("Reply Timeout")
+  }
 }
 
 func (me *Peer) handleKVStorePacket(packet *packets.Packet) {
