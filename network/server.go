@@ -5,14 +5,14 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"net"
-	"github.com/tomdionysus/trinity/util"
-	"github.com/tomdionysus/trinity/kvstore"
-	"github.com/tomdionysus/trinity/packets"
-	"github.com/tomdionysus/consistenthash"
 	"fmt"
 	"encoding/gob"
 	"errors"
 	"time"
+	"github.com/tomdionysus/trinity/util"
+	"github.com/tomdionysus/trinity/kvstore"
+	"github.com/tomdionysus/trinity/packets"
+	ch "github.com/tomdionysus/consistenthash"
 )
 
 const (
@@ -21,7 +21,7 @@ const (
 )
 
 type TLSServer struct {
-	ServerNode *consistenthash.ServerNode
+	ServerNode *ch.ServerNode
 
 	CACertificate *tls.Certificate
 	Certificate *tls.Certificate
@@ -40,7 +40,7 @@ type TLSServer struct {
 
 func NewTLSServer(logger *util.Logger, caPool *CAPool, kvStore *kvstore.KVStore, hostname string) *TLSServer {
 	inst := &TLSServer{
-		ServerNode: consistenthash.NewServerNode(hostname),
+		ServerNode: ch.NewServerNode(hostname),
 		Logger: logger,
 		ControlChannel: make(chan(int)),
 		StatusChannel: make(chan(int)),
@@ -108,7 +108,7 @@ func (me *TLSServer) Stop() {
 	me.ControlChannel <- CmdStop
 }
 
-func (me *TLSServer) IsConnectedTo(id consistenthash.Key) bool {
+func (me *TLSServer) IsConnectedTo(id ch.Key) bool {
 	_, found := me.Connections[id]
 	return found
 }
@@ -127,7 +127,7 @@ func (me *TLSServer) NotifyNewPeer(newPeer *Peer) {
 // Distributed Key Value store methods
 
 func (me *TLSServer) SetKey(key string, value []byte, flags int16, expiry *time.Time) {
-	keymd5 := consistenthash.NewMD5Key(key)
+	keymd5 := ch.NewMD5Key(key)
 	nodes := me.ServerNode.GetNodesFor(keymd5, 3)
 	me.Logger.Debug("Server","SetKey: %d peers for key %02X", len(nodes), keymd5)
 	for _, node := range nodes {
@@ -154,13 +154,13 @@ func (me *TLSServer) SetKey(key string, value []byte, flags int16, expiry *time.
 				TargetID: node.ID,
 			}
 			packet := packets.NewPacket(packets.CMD_KVSTORE, payload)
-			peer.SendPacketWaitReply(packet, 0)
+			peer.SendPacketWaitReply(packet, 5*time.Second)
 		}
 	}
 }
 
 func (me *TLSServer) GetKey(key string) ([]byte, int16, bool) {
-	keymd5 := consistenthash.NewMD5Key(key)
+	keymd5 := ch.NewMD5Key(key)
 	nodes := me.ServerNode.GetNodesFor(keymd5, 3)
 	for _, node := range nodes {
 		if node.ID == me.ServerNode.ID {
@@ -184,7 +184,7 @@ func (me *TLSServer) GetKey(key string) ([]byte, int16, bool) {
 				TargetID: node.ID,
 			}
 			packet := packets.NewPacket(packets.CMD_KVSTORE, payload)
-			reply, err := peer.SendPacketWaitReply(packet, 0)
+			reply, err := peer.SendPacketWaitReply(packet, 5*time.Second)
 			
 			// Process reply or timeout
 			if err==nil {
@@ -201,7 +201,6 @@ func (me *TLSServer) GetKey(key string) ([]byte, int16, bool) {
 				}
 			} else {
 				me.Logger.Warn("Server","GetKey: Reply Timeout")
-				// TODO: Timeout
 			}
 		}
 	}
@@ -209,7 +208,7 @@ func (me *TLSServer) GetKey(key string) ([]byte, int16, bool) {
 }
 
 func (me *TLSServer) DeleteKey(key string) bool {
-	keymd5 := consistenthash.NewMD5Key(key)
+	keymd5 := ch.NewMD5Key(key)
 	node := me.ServerNode.GetNodeFor(keymd5)
 	if node.ID == me.ServerNode.ID {
 		me.Logger.Debug("Server","DeleteKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
@@ -225,7 +224,7 @@ func (me *TLSServer) DeleteKey(key string) bool {
 			TargetID: node.ID,
 		}
 		packet := packets.NewPacket(packets.CMD_KVSTORE, payload)
-		reply, err := me.Connections[node.ID].SendPacketWaitReply(packet, 0)
+		reply, err := me.Connections[node.ID].SendPacketWaitReply(packet, 5*time.Second)
 		
 		// Process reply or timeout
 		if err==nil {
@@ -241,14 +240,12 @@ func (me *TLSServer) DeleteKey(key string) bool {
 			}
 		} else {
 			me.Logger.Warn("Server","DeleteKey: Reply Timeout")
-			// TODO: Timeout
 		}
 	}
 	return false
 }
 
 func (me *TLSServer) server_loop() {
-
 	// Connection Acceptor Loop
 	go func() {
 		for {
@@ -286,6 +283,6 @@ func (me *TLSServer) server_loop() {
 }
 
 func init() {
-	gob.Register(consistenthash.ServerNetworkNode{})
+	gob.Register(ch.ServerNetworkNode{})
 }
 

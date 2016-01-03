@@ -8,7 +8,7 @@ import(
   "github.com/tomdionysus/trinity/util"
 )
 
-// TrinityMainLoop for Linux
+// TrinityMainLoop for Linux (No SIGINFO)
 func TrinityMainLoop(svr *network.TLSServer, logger *util.Logger) {
   // Notify SIGINT, SIGTERM
   c := make(chan os.Signal, 1)
