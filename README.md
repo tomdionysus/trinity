@@ -67,3 +67,11 @@ trinity-server --ca=<CA_PEM> --cert=<CERT_PEM> [other flags]
 * [Golang](https://golang.org)
 * [Consistent Hashing](https://en.wikipedia.org/wiki/Consistent_hashing)
 * [Memcache Protocol](https://github.com/memcached/memcached/blob/master/doc/protocol.txt)
+
+## License
+
+trinity is licensed under the Open Source MIT license. Please see the [License File](LICENSE.txt) for more details.
+
+## Code Of Conduct
+
+The trinity project supports and enforces [The Contributor Covenant](http://contributor-covenant.org/) code of conduct. Please read [the code of conduct](CODE_OF_CONDUCT.md) before contributing.
