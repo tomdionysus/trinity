@@ -32,10 +32,10 @@ func NewConfig() *Config {
 	return inst
 }
 
-func (me *Config) Validate() (bool, []error) {
+func (cfg *Config) Validate() (bool, []error) {
 	errs := []error{}
-	if *me.Port < 0 || *me.Port > 65535 {
-		errs = append(errs, errors.New(fmt.Sprintf("Port %d is invalid (0-65535)", *me.Port)))
+	if *cfg.Port < 0 || *cfg.Port > 65535 {
+		errs = append(errs, errors.New(fmt.Sprintf("Port %d is invalid (0-65535)", *cfg.Port)))
 	}
 	return len(errs) == 0, errs
 }

@@ -20,33 +20,33 @@ func NewTable(name string) *Table {
 	}
 }
 
-func (me *Table) AddField(field *Field) error {
-	if _, exists := me.Fields[field.Name]; exists {
+func (tb *Table) AddField(field *Field) error {
+	if _, exists := tb.Fields[field.Name]; exists {
 		return FieldExistsError
 	}
-	me.Fields[field.Name] = field
+	tb.Fields[field.Name] = field
 	return nil
 }
 
-func (me *Table) RemoveField(field *Field) error {
-	if _, exists := me.Fields[field.Name]; !exists {
+func (tb *Table) RemoveField(field *Field) error {
+	if _, exists := tb.Fields[field.Name]; !exists {
 		return FieldNotFoundError
 	}
-	delete(me.Fields, field.Name)
+	delete(tb.Fields, field.Name)
 	return nil
 }
 
-func (me *Table) RemoveFieldByName(fieldName string) error {
-	if _, exists := me.Fields[fieldName]; !exists {
+func (tb *Table) RemoveFieldByName(fieldName string) error {
+	if _, exists := tb.Fields[fieldName]; !exists {
 		return FieldNotFoundError
 	}
-	delete(me.Fields, fieldName)
+	delete(tb.Fields, fieldName)
 	return nil
 }
 
-func (me *Table) ToSQL(wrap bool) string {
+func (tb *Table) ToSQL(wrap bool) string {
 	if wrap {
-		return "(" + me.Name + ")"
+		return "(" + tb.Name + ")"
 	}
-	return me.Name
+	return tb.Name
 }

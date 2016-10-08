@@ -21,15 +21,15 @@ func NewCAPool(logger *util.Logger) *CAPool {
 	return inst
 }
 
-func (me *CAPool) LoadPEM(certFile string) error {
+func (cp *CAPool) LoadPEM(certFile string) error {
 	cabytes, err := ioutil.ReadFile(certFile)
 	if err != nil {
-		me.Logger.Error("CAPool", "Cannot Load CA File '%s': %s", certFile, err.Error())
+		cp.Logger.Error("CAPool", "Cannot Load CA File '%s': %s", certFile, err.Error())
 		return err
 	}
 
-	if !me.Pool.AppendCertsFromPEM(cabytes) {
-		me.Logger.Error("CAPool", "Cannot Parse PEM CA File '%s'", certFile)
+	if !cp.Pool.AppendCertsFromPEM(cabytes) {
+		cp.Logger.Error("CAPool", "Cannot Parse PEM CA File '%s'", certFile)
 		return errors.New("Cannot Parse CA File")
 	}
 

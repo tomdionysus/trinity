@@ -20,26 +20,26 @@ func NewDatabase(name string) *Database {
 	return inst
 }
 
-func (me *Database) AddTable(table *Table) error {
-	if _, exists := me.Tables[table.Name]; exists {
+func (db *Database) AddTable(table *Table) error {
+	if _, exists := db.Tables[table.Name]; exists {
 		return TableExistsError
 	}
-	me.Tables[table.Name] = table
+	db.Tables[table.Name] = table
 	return nil
 }
 
-func (me *Database) RemoveTable(table *Table) error {
-	if _, exists := me.Tables[table.Name]; !exists {
+func (db *Database) RemoveTable(table *Table) error {
+	if _, exists := db.Tables[table.Name]; !exists {
 		return TableNotFoundError
 	}
-	delete(me.Tables, table.Name)
+	delete(db.Tables, table.Name)
 	return nil
 }
 
-func (me *Database) RemoveTableByName(tableName string) error {
-	if _, exists := me.Tables[tableName]; !exists {
+func (db *Database) RemoveTableByName(tableName string) error {
+	if _, exists := db.Tables[tableName]; !exists {
 		return TableNotFoundError
 	}
-	delete(me.Tables, tableName)
+	delete(db.Tables, tableName)
 	return nil
 }

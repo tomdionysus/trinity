@@ -72,101 +72,101 @@ func NewConnectingPeer(logger *util.Logger, server *TLSServer, connection *tls.C
 	return inst
 }
 
-func (me *Peer) Connect() error {
-	me.Incoming = false
-	me.State = PeerStateConnecting
-	conn, err := tls.Dial("tcp", me.Address, &tls.Config{
-		RootCAs:      me.Server.CAPool.Pool,
-		Certificates: []tls.Certificate{*me.Server.Certificate},
+func (pr *Peer) Connect() error {
+	pr.Incoming = false
+	pr.State = PeerStateConnecting
+	conn, err := tls.Dial("tcp", pr.Address, &tls.Config{
+		RootCAs:      pr.Server.CAPool.Pool,
+		Certificates: []tls.Certificate{*pr.Server.Certificate},
 	})
 	if err != nil {
-		me.Logger.Error("Peer", "Cannot connect to %s: %s", me.Address, err.Error())
-		me.Disconnect()
+		pr.Logger.Error("Peer", "Cannot connect to %s: %s", pr.Address, err.Error())
+		pr.Disconnect()
 		return err
 	}
-	me.Connection = conn
+	pr.Connection = conn
 	state := conn.ConnectionState()
 	if len(state.PeerCertificates) == 0 {
-		me.Logger.Error("Peer", "Cannot connect to %s: Peer has no certificates", me.Address)
-		me.Disconnect()
+		pr.Logger.Error("Peer", "Cannot connect to %s: Peer has no certificates", pr.Address)
+		pr.Disconnect()
 		return errors.New("Peer has no certificates")
 	}
-	me.State = PeerStateHandshake
+	pr.State = PeerStateHandshake
 	return nil
 }
 
-func (me *Peer) Disconnect() {
-	if me.State == PeerStateConnected {
-		me.State = PeerStateDisconnected
-		me.Server.ServerNode.DeregisterNode(me.ServerNetworkNode)
-		if me.HeartbeatTicker != nil {
-			me.HeartbeatTicker.Stop()
+func (pr *Peer) Disconnect() {
+	if pr.State == PeerStateConnected {
+		pr.State = PeerStateDisconnected
+		pr.Server.ServerNode.DeregisterNode(pr.ServerNetworkNode)
+		if pr.HeartbeatTicker != nil {
+			pr.HeartbeatTicker.Stop()
 		}
-		if me.Connection != nil {
-			me.Connection.Close()
+		if pr.Connection != nil {
+			pr.Connection.Close()
 		}
-		delete(me.Server.Connections, me.ServerNetworkNode.ID)
-		me.Logger.Info("Peer", "%02X: Disconnected", me.ServerNetworkNode.ID)
+		delete(pr.Server.Connections, pr.ServerNetworkNode.ID)
+		pr.Logger.Info("Peer", "%02X: Disconnected", pr.ServerNetworkNode.ID)
 	}
 }
 
-func (me *Peer) Start() error {
-	if me.State != PeerStateHandshake {
-		me.Logger.Error("Peer", "Cannot Start Client, Handshake not ready")
+func (pr *Peer) Start() error {
+	if pr.State != PeerStateHandshake {
+		pr.Logger.Error("Peer", "Cannot Start Client, Handshake not ready")
 		return errors.New("Handshake not ready")
 	}
-	err := me.Connection.Handshake()
+	err := pr.Connection.Handshake()
 	if err != nil {
-		me.Logger.Error("Peer", "Peer TLS Handshake failed, disconnecting: %s", err.Error())
-		me.Disconnect()
+		pr.Logger.Error("Peer", "Peer TLS Handshake failed, disconnecting: %s", err.Error())
+		pr.Disconnect()
 		return errors.New("TLS Handshake Failed")
 	}
-	state := me.Connection.ConnectionState()
+	state := pr.Connection.ConnectionState()
 	if len(state.PeerCertificates) == 0 {
-		me.Logger.Error("Peer", "Peer has no certificates, disconnecting")
-		me.Disconnect()
+		pr.Logger.Error("Peer", "Peer has no certificates, disconnecting")
+		pr.Disconnect()
 		return errors.New("Peer sent no certificates")
 	}
 	sub := state.PeerCertificates[0].Subject.CommonName
-	me.Logger.Info("Peer", "Connected to %s (%s) [%s]", me.Connection.RemoteAddr(), sub, Ciphers[me.Connection.ConnectionState().CipherSuite])
+	pr.Logger.Info("Peer", "Connected to %s (%s) [%s]", pr.Connection.RemoteAddr(), sub, Ciphers[pr.Connection.ConnectionState().CipherSuite])
 
-	me.Reader = gob.NewDecoder(me.Connection)
-	me.Writer = gob.NewEncoder(me.Connection)
+	pr.Reader = gob.NewDecoder(pr.Connection)
+	pr.Writer = gob.NewEncoder(pr.Connection)
 
-	go me.heartbeat()
+	go pr.heartbeat()
 
-	me.SendDistribution()
+	pr.SendDistribution()
 
-	go me.process()
+	go pr.process()
 
 	return nil
 }
 
 // Ping the Peer every second.
-func (me *Peer) heartbeat() {
-	me.HeartbeatTicker = time.NewTicker(time.Second)
+func (pr *Peer) heartbeat() {
+	pr.HeartbeatTicker = time.NewTicker(time.Second)
 
 	for {
-		<-me.HeartbeatTicker.C
+		<-pr.HeartbeatTicker.C
 
 		// Check For Defib
-		if time.Now().After(me.LastHeartbeat.Add(5 * time.Second)) {
-			me.Logger.Warn("Peer", "%02X: Peer Defib (no response for >5 seconds)", me.ServerNetworkNode.ID)
-			me.State = PeerStateDefib
+		if time.Now().After(pr.LastHeartbeat.Add(5 * time.Second)) {
+			pr.Logger.Warn("Peer", "%02X: Peer Defib (no response for >5 seconds)", pr.ServerNetworkNode.ID)
+			pr.State = PeerStateDefib
 		}
 
-		switch me.State {
+		switch pr.State {
 		case PeerStateConnected:
-			err := me.SendPacket(packets.NewPacket(packets.CMD_HEARTBEAT, nil))
+			err := pr.SendPacket(packets.NewPacket(packets.CMD_HEARTBEAT, nil))
 			if err != nil {
-				me.Logger.Error("Peer", "%02X: Error Sending Heartbeat, disconnecting", me.ServerNetworkNode.ID)
-				me.Disconnect()
+				pr.Logger.Error("Peer", "%02X: Error Sending Heartbeat, disconnecting", pr.ServerNetworkNode.ID)
+				pr.Disconnect()
 				return
 			}
 		case PeerStateDefib:
-			if time.Now().After(me.LastHeartbeat.Add(10 * time.Second)) {
-				me.Logger.Warn("Peer", "%02X: Peer DOA (Defib for 5 seconds, disconnecting)", me.ServerNetworkNode.ID)
-				me.Disconnect()
+			if time.Now().After(pr.LastHeartbeat.Add(10 * time.Second)) {
+				pr.Logger.Warn("Peer", "%02X: Peer DOA (Defib for 5 seconds, disconnecting)", pr.ServerNetworkNode.ID)
+				pr.Disconnect()
 				return
 			}
 		}
@@ -175,18 +175,18 @@ func (me *Peer) heartbeat() {
 
 }
 
-func (me *Peer) process() {
+func (pr *Peer) process() {
 
 	var packet packets.Packet
 
 	for {
 		// Read Command
-		err := me.Reader.Decode(&packet)
+		err := pr.Reader.Decode(&packet)
 		if err != nil {
 			if err.Error() == "EOF" {
-				me.Logger.Debug("Peer", "%02X: Peer Closed Connection", me.ServerNetworkNode.ID)
+				pr.Logger.Debug("Peer", "%02X: Peer Closed Connection", pr.ServerNetworkNode.ID)
 			} else {
-				me.Logger.Error("Peer", "%02X: Error Reading: %s", me.ServerNetworkNode.ID, err.Error())
+				pr.Logger.Error("Peer", "%02X: Error Reading: %s", pr.ServerNetworkNode.ID, err.Error())
 			}
 			goto end
 		}
@@ -195,138 +195,138 @@ func (me *Peer) process() {
 		// Packets in Connecting / Handshake
 
 		case packets.CMD_HEARTBEAT:
-			me.LastHeartbeat = time.Now()
+			pr.LastHeartbeat = time.Now()
 		case packets.CMD_DISTRIBUTION:
-			if me.ServerNetworkNode != nil {
-				me.Logger.Warn("Peer", "%02X: CMD_DISTRIBUTION received from registered peer", me.ServerNetworkNode.ID)
+			if pr.ServerNetworkNode != nil {
+				pr.Logger.Warn("Peer", "%02X: CMD_DISTRIBUTION received from registered peer", pr.ServerNetworkNode.ID)
 				break
 			}
 			servernetworknode := packet.Payload.(consistenthash.ServerNetworkNode)
-			me.ServerNetworkNode = &servernetworknode
-			me.Server.Connections[me.ServerNetworkNode.ID] = me
-			me.Logger.Debug("Peer", "%02X: CMD_DISTRIBUTION (%s)", me.ServerNetworkNode.ID, me.Connection.RemoteAddr())
-			redistribution, err := me.Server.ServerNode.RegisterNode(me.ServerNetworkNode)
-			me.State = PeerStateConnected
+			pr.ServerNetworkNode = &servernetworknode
+			pr.Server.Connections[pr.ServerNetworkNode.ID] = pr
+			pr.Logger.Debug("Peer", "%02X: CMD_DISTRIBUTION (%s)", pr.ServerNetworkNode.ID, pr.Connection.RemoteAddr())
+			redistribution, err := pr.Server.ServerNode.RegisterNode(pr.ServerNetworkNode)
+			pr.State = PeerStateConnected
 			if err != nil {
-				me.Logger.Error("Peer", "%02X: Register Node Distribution Failed: %s", me.ServerNetworkNode.ID, err.Error())
+				pr.Logger.Error("Peer", "%02X: Register Node Distribution Failed: %s", pr.ServerNetworkNode.ID, err.Error())
 				break
 			}
 			if len(redistribution) > 0 {
 				// for _, redist := range redistribution {
-				//   me.Logger.Debug("Peer","Redistribution: %02x - %02x :  %02X -> %02X", redist.Start, redist.End, redist.SourceNodeID, redist.DestinationNodeID)
+				//   pr.Logger.Debug("Peer","Redistribution: %02x - %02x :  %02X -> %02X", redist.Start, redist.End, redist.SourceNodeID, redist.DestinationNodeID)
 				// }
 			}
-			me.Server.NotifyNewPeer(me)
+			pr.Server.NotifyNewPeer(pr)
 		// Packets in Connected
 
 		case packets.CMD_KVSTORE:
-			me.Logger.Debug("Peer", "%02X: CMD_KVSTORE", me.ServerNetworkNode.ID)
-			me.handleKVStorePacket(&packet)
+			pr.Logger.Debug("Peer", "%02X: CMD_KVSTORE", pr.ServerNetworkNode.ID)
+			pr.handleKVStorePacket(&packet)
 		case packets.CMD_KVSTORE_ACK:
-			me.Logger.Debug("Peer", "%02X: CMD_KVSTORE_ACK", me.ServerNetworkNode.ID)
-			me.handleReply(&packet)
+			pr.Logger.Debug("Peer", "%02X: CMD_KVSTORE_ACK", pr.ServerNetworkNode.ID)
+			pr.handleReply(&packet)
 		case packets.CMD_KVSTORE_NOT_FOUND:
-			me.Logger.Debug("Peer", "%02X: CMD_KVSTORE_NOT_FOUND", me.ServerNetworkNode.ID)
-			me.handleReply(&packet)
+			pr.Logger.Debug("Peer", "%02X: CMD_KVSTORE_NOT_FOUND", pr.ServerNetworkNode.ID)
+			pr.handleReply(&packet)
 		case packets.CMD_PEERLIST:
 			peers := packet.Payload.(packets.PeerListPacket)
-			me.Logger.Debug("Peer", "%02X: CMD_PEERLIST (%d Peers)", me.ServerNetworkNode.ID, len(peers))
+			pr.Logger.Debug("Peer", "%02X: CMD_PEERLIST (%d Peers)", pr.ServerNetworkNode.ID, len(peers))
 			for id, k := range peers {
-				if me.Server.Listener.Addr().String() == k {
-					me.Logger.Warn("Peer", "%02X: - Peer %02X (%s) notified us of ourselves.", id, me.ServerNetworkNode.ID, k)
+				if pr.Server.Listener.Addr().String() == k {
+					pr.Logger.Warn("Peer", "%02X: - Peer %02X (%s) notified us of ourselves.", id, pr.ServerNetworkNode.ID, k)
 				} else {
-					if !me.Server.IsConnectedTo(id) {
-						me.Logger.Debug("Peer", "%02X: - Connecting New Peer %02X (%s)", id, me.ServerNetworkNode.ID, k)
-						me.Server.ConnectTo(k)
+					if !pr.Server.IsConnectedTo(id) {
+						pr.Logger.Debug("Peer", "%02X: - Connecting New Peer %02X (%s)", id, pr.ServerNetworkNode.ID, k)
+						pr.Server.ConnectTo(k)
 					} else {
-						me.Logger.Debug("Peer", "%02X: - Already Connected to Peer %02X (%s)", id, me.ServerNetworkNode.ID, k)
+						pr.Logger.Debug("Peer", "%02X: - Already Connected to Peer %02X (%s)", id, pr.ServerNetworkNode.ID, k)
 					}
 				}
 			}
 		default:
-			me.Logger.Warn("Peer", "%02X: Unknown Packet Command %d", me.ServerNetworkNode.ID, packet.Command)
+			pr.Logger.Warn("Peer", "%02X: Unknown Packet Command %d", pr.ServerNetworkNode.ID, packet.Command)
 		}
 	}
 end:
 
-	me.Disconnect()
+	pr.Disconnect()
 }
 
-func (me *Peer) handleReply(packet *packets.Packet) {
-	chn, found := me.Replies[packet.RequestID]
+func (pr *Peer) handleReply(packet *packets.Packet) {
+	chn, found := pr.Replies[packet.RequestID]
 	if found {
-		delete(me.Replies, packet.RequestID)
+		delete(pr.Replies, packet.RequestID)
 		chn <- packet
 	} else {
-		me.Logger.Warn("Peer", "%02X: Unsolicited Reply to unknown packet %02X", me.ServerNetworkNode.ID, packet.RequestID)
+		pr.Logger.Warn("Peer", "%02X: Unsolicited Reply to unknown packet %02X", pr.ServerNetworkNode.ID, packet.RequestID)
 	}
 }
 
-func (me *Peer) SendDistribution() error {
-	packet := packets.NewPacket(packets.CMD_DISTRIBUTION, me.Server.ServerNode.ServerNetworkNode)
-	me.SendPacket(packet)
+func (pr *Peer) SendDistribution() error {
+	packet := packets.NewPacket(packets.CMD_DISTRIBUTION, pr.Server.ServerNode.ServerNetworkNode)
+	pr.SendPacket(packet)
 	return nil
 }
 
-func (me *Peer) SendPacket(packet *packets.Packet) error {
-	err := me.Writer.Encode(packet)
+func (pr *Peer) SendPacket(packet *packets.Packet) error {
+	err := pr.Writer.Encode(packet)
 	if err != nil {
-		me.Logger.Error("Peer", "Error Writing: %s", err.Error())
+		pr.Logger.Error("Peer", "Error Writing: %s", err.Error())
 	}
 	return err
 }
 
-func (me *Peer) SendPacketWaitReply(packet *packets.Packet, timeout time.Duration) (*packets.Packet, error) {
-	if me.State != PeerStateConnected {
-		me.Logger.Error("Peer", "%02X: Cannot send packet ID %02X, not PeerStateConnected", me.ServerNetworkNode.ID, packet.ID)
+func (pr *Peer) SendPacketWaitReply(packet *packets.Packet, timeout time.Duration) (*packets.Packet, error) {
+	if pr.State != PeerStateConnected {
+		pr.Logger.Error("Peer", "%02X: Cannot send packet ID %02X, not PeerStateConnected", pr.ServerNetworkNode.ID, packet.ID)
 		return nil, errors.New("Cannot send, state not PeerStateConnected")
 	}
 
-	me.Replies[packet.ID] = make(chan (*packets.Packet))
+	pr.Replies[packet.ID] = make(chan (*packets.Packet))
 	ticker := time.NewTicker(timeout)
-	me.SendPacket(packet)
+	pr.SendPacket(packet)
 	var reply *packets.Packet
 	select {
-	case reply = <-me.Replies[packet.ID]:
-		me.Logger.Debug("Peer", "%02X: Got Reply %02X for packet ID %02X", me.ServerNetworkNode.ID, reply.ID, packet.ID)
+	case reply = <-pr.Replies[packet.ID]:
+		pr.Logger.Debug("Peer", "%02X: Got Reply %02X for packet ID %02X", pr.ServerNetworkNode.ID, reply.ID, packet.ID)
 		ticker.Stop()
 		return reply, nil
 	case <-ticker.C:
-		me.Logger.Warn("Peer", "%02X: Reply Timeout for packet ID %02X", me.ServerNetworkNode.ID, packet.ID)
+		pr.Logger.Warn("Peer", "%02X: Reply Timeout for packet ID %02X", pr.ServerNetworkNode.ID, packet.ID)
 		return nil, errors.New("Reply Timeout")
 	}
 }
 
-func (me *Peer) handleKVStorePacket(packet *packets.Packet) {
+func (pr *Peer) handleKVStorePacket(packet *packets.Packet) {
 	kvpacket := packet.Payload.(packets.KVStorePacket)
 	switch kvpacket.Command {
 	case packets.CMD_KVSTORE_SET:
-		me.handleKVStoreSet(&kvpacket, packet)
+		pr.handleKVStoreSet(&kvpacket, packet)
 	case packets.CMD_KVSTORE_GET:
-		me.handleKVStoreGet(&kvpacket, packet)
+		pr.handleKVStoreGet(&kvpacket, packet)
 	case packets.CMD_KVSTORE_DELETE:
-		me.handleKVStoreDelete(&kvpacket, packet)
+		pr.handleKVStoreDelete(&kvpacket, packet)
 	default:
-		me.Logger.Error("Peer", "KVStorePacket: Unknown Command %d", packet.Command)
+		pr.Logger.Error("Peer", "KVStorePacket: Unknown Command %d", packet.Command)
 	}
 }
 
-func (me *Peer) handleKVStoreSet(packet *packets.KVStorePacket, request *packets.Packet) {
-	me.Logger.Debug("Peer", "%02X: KVStoreSet: %s = %s", me.ServerNetworkNode.ID, packet.Key, packet.Data)
-	me.Server.KVStore.Set(
+func (pr *Peer) handleKVStoreSet(packet *packets.KVStorePacket, request *packets.Packet) {
+	pr.Logger.Debug("Peer", "%02X: KVStoreSet: %s = %s", pr.ServerNetworkNode.ID, packet.Key, packet.Data)
+	pr.Server.KVStore.Set(
 		packet.Key,
 		packet.Data,
 		packet.Flags,
 		packet.ExpiresAt)
 
 	response := packets.NewResponsePacket(packets.CMD_KVSTORE_ACK, request.ID, packet.Key)
-	me.Logger.Debug("Peer", "%02X: KVStoreSet: %s Acknowledge, replying", me.ServerNetworkNode.ID, packet.Key)
-	me.SendPacket(response)
+	pr.Logger.Debug("Peer", "%02X: KVStoreSet: %s Acknowledge, replying", pr.ServerNetworkNode.ID, packet.Key)
+	pr.SendPacket(response)
 }
 
-func (me *Peer) handleKVStoreGet(packet *packets.KVStorePacket, request *packets.Packet) {
-	me.Logger.Debug("Peer", "%02X: KVStoreGet: %s", me.ServerNetworkNode.ID, packet.Key)
-	value, flags, found := me.Server.KVStore.Get(packet.Key)
+func (pr *Peer) handleKVStoreGet(packet *packets.KVStorePacket, request *packets.Packet) {
+	pr.Logger.Debug("Peer", "%02X: KVStoreGet: %s", pr.ServerNetworkNode.ID, packet.Key)
+	value, flags, found := pr.Server.KVStore.Get(packet.Key)
 
 	var response *packets.Packet
 
@@ -338,28 +338,28 @@ func (me *Peer) handleKVStoreGet(packet *packets.KVStorePacket, request *packets
 			Flags:   flags,
 		}
 		response = packets.NewResponsePacket(packets.CMD_KVSTORE_ACK, request.ID, payload)
-		me.Logger.Debug("Peer", "%02X: KVStoreGet: %s = %s, replying", me.ServerNetworkNode.ID, packet.Key, value)
+		pr.Logger.Debug("Peer", "%02X: KVStoreGet: %s = %s, replying", pr.ServerNetworkNode.ID, packet.Key, value)
 	} else {
 		response = packets.NewResponsePacket(packets.CMD_KVSTORE_NOT_FOUND, request.ID, packet.Key)
-		me.Logger.Debug("Peer", "%02X: KVStoreGet: %s Not found, replying", me.ServerNetworkNode.ID, packet.Key)
+		pr.Logger.Debug("Peer", "%02X: KVStoreGet: %s Not found, replying", pr.ServerNetworkNode.ID, packet.Key)
 	}
 
-	me.SendPacket(response)
+	pr.SendPacket(response)
 }
 
-func (me *Peer) handleKVStoreDelete(packet *packets.KVStorePacket, request *packets.Packet) {
-	me.Logger.Debug("Peer", "%02X: KVStoreDelete: %s", me.ServerNetworkNode.ID, packet.Key)
-	found := me.Server.KVStore.Delete(packet.Key)
+func (pr *Peer) handleKVStoreDelete(packet *packets.KVStorePacket, request *packets.Packet) {
+	pr.Logger.Debug("Peer", "%02X: KVStoreDelete: %s", pr.ServerNetworkNode.ID, packet.Key)
+	found := pr.Server.KVStore.Delete(packet.Key)
 
 	var response *packets.Packet
 
 	if found {
 		response = packets.NewResponsePacket(packets.CMD_KVSTORE_ACK, request.ID, packet.Key)
-		me.Logger.Debug("Peer", "%02X: KVStoreDelete: %s Deleted, replying", me.ServerNetworkNode.ID, packet.Key)
+		pr.Logger.Debug("Peer", "%02X: KVStoreDelete: %s Deleted, replying", pr.ServerNetworkNode.ID, packet.Key)
 	} else {
 		response = packets.NewResponsePacket(packets.CMD_KVSTORE_NOT_FOUND, request.ID, packet.Key)
-		me.Logger.Debug("Peer", "%02X: KVStoreDelete: %s Not found, replying", me.ServerNetworkNode.ID, packet.Key)
+		pr.Logger.Debug("Peer", "%02X: KVStoreDelete: %s Not found, replying", pr.ServerNetworkNode.ID, packet.Key)
 	}
 
-	me.SendPacket(response)
+	pr.SendPacket(response)
 }

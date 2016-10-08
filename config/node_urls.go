@@ -6,11 +6,11 @@ import (
 
 type NodeURLs []string
 
-func (me *NodeURLs) Set(value string) error {
-	*me = append(*me, value)
+func (nurl *NodeURLs) Set(value string) error {
+	*nurl = append(*nurl, value)
 	return nil
 }
 
-func (i *NodeURLs) String() string {
-	return fmt.Sprint(*i)
+func (nurl *NodeURLs) String() string {
+	return fmt.Sprint(*nurl)
 }

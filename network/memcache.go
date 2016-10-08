@@ -29,74 +29,74 @@ func NewMemcacheServer(logger *util.Logger, port int, server *TLSServer) *Memcac
 	return inst
 }
 
-func (me *MemcacheServer) Init() error {
-	me.Logger.Debug("Memcache", "Init")
+func (mcs *MemcacheServer) Init() error {
+	mcs.Logger.Debug("Memcache", "Init")
 	return nil
 }
 
-func (me *MemcacheServer) Start() error {
-	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", me.Port))
+func (mcs *MemcacheServer) Start() error {
+	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", mcs.Port))
 	if err != nil {
-		me.Logger.Error("Memcache", "Cannot bind to port [%d], shutting down", me.Port)
+		mcs.Logger.Error("Memcache", "Cannot bind to port [%d], shutting down", mcs.Port)
 		return err
 	}
-	me.Listener = listener
-	me.Logger.Debug("Memcache", "Listening on port [%d]", me.Port)
+	mcs.Listener = listener
+	mcs.Logger.Debug("Memcache", "Listening on port [%d]", mcs.Port)
 	go func() {
 		for {
 			// Wait for a connection.
 			conn, err := listener.Accept()
 			if err != nil {
-				me.Logger.Info("Memcache", "Closed Listener")
+				mcs.Logger.Info("Memcache", "Closed Listener")
 				break
 			} else {
 				addr := conn.RemoteAddr().String()
-				me.Logger.Info("Memcache", "Incoming Connection from [%s]", addr)
-				go me.handleConnection(addr, conn)
+				mcs.Logger.Info("Memcache", "Incoming Connection from [%s]", addr)
+				go mcs.handleConnection(addr, conn)
 			}
 		}
 	}()
 	return nil
 }
 
-func (me *MemcacheServer) Stop() {
+func (mcs *MemcacheServer) Stop() {
 	// Listener
-	if me.Listener != nil {
-		me.Listener.Close()
-		me.Listener = nil
+	if mcs.Listener != nil {
+		mcs.Listener.Close()
+		mcs.Listener = nil
 	}
 	// Close all connections
-	for addr, conn := range me.Connections {
-		me.Logger.Debug("Memcache", "Force closing Connection [%s]", addr)
+	for addr, conn := range mcs.Connections {
+		mcs.Logger.Debug("Memcache", "Force closing Connection [%s]", addr)
 		conn.Close()
 	}
 }
 
 // Private
 
-func (me *MemcacheServer) handleConnection(addr string, conn net.Conn) {
-	me.Connections[addr] = conn
+func (mcs *MemcacheServer) handleConnection(addr string, conn net.Conn) {
+	mcs.Connections[addr] = conn
 
 	reader := bufio.NewReader(conn)
 	writer := bufio.NewWriter(conn)
 
-	me.Logger.Debug("Memcache", "[%s] -> Connected", addr)
+	mcs.Logger.Debug("Memcache", "[%s] -> Connected", addr)
 	for {
 		input, err := reader.ReadString('\n')
 		if err != nil {
-			me.Logger.Error("Memcache", "[%s] -> Error: %s", addr, err.Error())
+			mcs.Logger.Error("Memcache", "[%s] -> Error: %s", addr, err.Error())
 		}
 		cmds := strings.Split(strings.Trim(input, " \n\r"), " ")
-		if me.handleCommand(addr, reader, writer, cmds) {
+		if mcs.handleCommand(addr, reader, writer, cmds) {
 			break
 		}
 	}
 
 	conn.Close()
-	delete(me.Connections, addr)
+	delete(mcs.Connections, addr)
 }
 
-func (me *MemcacheServer) handleCommand(addr string, reader *bufio.Reader, writer *bufio.Writer, args []string) bool {
+func (mcs *MemcacheServer) handleCommand(addr string, reader *bufio.Reader, writer *bufio.Writer, args []string) bool {
 
 	if len(args) == 0 {
 		writer.WriteString("ERROR\r\n")
@@ -110,13 +110,13 @@ func (me *MemcacheServer) handleCommand(addr string, reader *bufio.Reader, write
 		writer.Flush()
 		return true
 	case "set":
-		me.handleSet(addr, reader, writer, args)
+		mcs.handleSet(addr, reader, writer, args)
 		return false
 	case "get":
-		me.handleGet(addr, reader, writer, args)
+		mcs.handleGet(addr, reader, writer, args)
 		return false
 	case "delete":
-		me.handleDelete(addr, reader, writer, args)
+		mcs.handleDelete(addr, reader, writer, args)
 		return false
 	default:
 		writer.WriteString("ERROR\r\n")
@@ -127,7 +127,7 @@ func (me *MemcacheServer) handleCommand(addr string, reader *bufio.Reader, write
 	return false
 }
 
-func (me *MemcacheServer) handleSet(addr string, reader *bufio.Reader, writer *bufio.Writer, args []string) {
+func (mcs *MemcacheServer) handleSet(addr string, reader *bufio.Reader, writer *bufio.Writer, args []string) {
 	if len(args) > 6 || len(args) < 5 {
 		writer.WriteString("ERROR\r\n")
 		writer.Flush()
@@ -139,7 +139,7 @@ func (me *MemcacheServer) handleSet(addr string, reader *bufio.Reader, writer *b
 	// args[4] bytes
 	// args[5] noreply
 
-	me.Logger.Debug("Memcache", "[%s] -> Set %s", addr, args)
+	mcs.Logger.Debug("Memcache", "[%s] -> Set %s", addr, args)
 
 	expirytime, err := strconv.Atoi(args[3])
 	if err != nil {
@@ -183,21 +183,21 @@ func (me *MemcacheServer) handleSet(addr string, reader *bufio.Reader, writer *b
 		expiry := time.Now().UTC().Add(time.Duration(expirytime) * time.Second)
 		expparam = &expiry
 	}
-	me.Server.SetKey(args[1], buf[:], int16(flags), expparam)
+	mcs.Server.SetKey(args[1], buf[:], int16(flags), expparam)
 	writer.WriteString("STORED\r\n")
 	writer.Flush()
 }
 
-func (me *MemcacheServer) handleGet(addr string, reader *bufio.Reader, writer *bufio.Writer, args []string) {
+func (mcs *MemcacheServer) handleGet(addr string, reader *bufio.Reader, writer *bufio.Writer, args []string) {
 	if len(args) > 2 {
 		writer.WriteString("ERROR\r\n")
 		writer.Flush()
 		return
 	}
-	me.Logger.Debug("Memcache", "[%s] -> Get Key %s", addr, args[1])
-	value, flags, found := me.Server.GetKey(args[1])
+	mcs.Logger.Debug("Memcache", "[%s] -> Get Key %s", addr, args[1])
+	value, flags, found := mcs.Server.GetKey(args[1])
 	if found {
-		me.Logger.Debug("Memcache", "[%s] -> Found", addr)
+		mcs.Logger.Debug("Memcache", "[%s] -> Found", addr)
 		writer.WriteString(fmt.Sprintf("VALUE %s %d %d\r\n", args[1], flags, len(value)))
 		writer.Write(value)
 		writer.Write([]byte{13, 10})
@@ -206,20 +206,20 @@ func (me *MemcacheServer) handleGet(addr string, reader *bufio.Reader, writer *b
 	writer.Flush()
 }
 
-func (me *MemcacheServer) handleDelete(addr string, reader *bufio.Reader, writer *bufio.Writer, args []string) {
+func (mcs *MemcacheServer) handleDelete(addr string, reader *bufio.Reader, writer *bufio.Writer, args []string) {
 	if len(args) > 3 {
 		writer.WriteString("ERROR\r\n")
 		writer.Flush()
 		return
 	}
-	me.Logger.Debug("Memcache", "[%s] -> Delete Key %s", addr, args[1])
-	found := me.Server.DeleteKey(args[1])
+	mcs.Logger.Debug("Memcache", "[%s] -> Delete Key %s", addr, args[1])
+	found := mcs.Server.DeleteKey(args[1])
 	if found {
-		me.Logger.Debug("Memcache", "[%s] -> Found", addr)
+		mcs.Logger.Debug("Memcache", "[%s] -> Found", addr)
 		writer.WriteString("DELETED\r\n")
 		writer.Flush()
 	} else {
-		me.Logger.Debug("Memcache", "[%s] -> Not Found", addr)
+		mcs.Logger.Debug("Memcache", "[%s] -> Not Found", addr)
 		writer.WriteString("NOT_FOUND\r\n")
 		writer.Flush()
 	}

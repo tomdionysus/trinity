@@ -52,71 +52,71 @@ func NewTLSServer(logger *util.Logger, caPool *CAPool, kvStore *kvstore.KVStore,
 	return inst
 }
 
-func (me *TLSServer) LoadPEMCert(certFile string, keyFile string) error {
+func (svr *TLSServer) LoadPEMCert(certFile string, keyFile string) error {
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err == nil {
-		me.Certificate = &cert
+		svr.Certificate = &cert
 		pcert, err := x509.ParseCertificate(cert.Certificate[0])
 		if err == nil {
-			me.Certificate.Leaf = pcert
+			svr.Certificate.Leaf = pcert
 		}
 	}
 	return err
 }
 
-func (me *TLSServer) ConnectTo(remoteAddr string) error {
-	if me.Listener.Addr().String() == remoteAddr {
+func (svr *TLSServer) ConnectTo(remoteAddr string) error {
+	if svr.Listener.Addr().String() == remoteAddr {
 		er := "Cannot Connect to self"
-		me.Logger.Error("Server", er)
+		svr.Logger.Error("Server", er)
 		return errors.New(er)
 	}
-	peer := NewPeer(me.Logger, me, remoteAddr)
+	peer := NewPeer(svr.Logger, svr, remoteAddr)
 	err := peer.Connect()
 	if err != nil {
-		me.Logger.Error("Server", "Cannot Connect to Node %s: %s", remoteAddr, err.Error())
+		svr.Logger.Error("Server", "Cannot Connect to Node %s: %s", remoteAddr, err.Error())
 		return err
 	}
 	peer.Start()
 	return nil
 }
 
-func (me *TLSServer) Listen(port uint16) error {
+func (svr *TLSServer) Listen(port uint16) error {
 	config := tls.Config{
-		ClientCAs:          me.CAPool.Pool,
-		ClientSessionCache: me.SessionCache,
+		ClientCAs:          svr.CAPool.Pool,
+		ClientSessionCache: svr.SessionCache,
 		ClientAuth:         tls.RequireAndVerifyClientCert,
-		Certificates:       []tls.Certificate{*me.Certificate},
+		Certificates:       []tls.Certificate{*svr.Certificate},
 		CipherSuites:       []uint16{0x0035, 0xc030, 0xc02c},
 	}
 
 	config.Rand = rand.Reader
 	listener, err := tls.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", port), &config)
 	if err != nil {
-		me.Logger.Error("Server", "Cannot listen on port %d", port)
+		svr.Logger.Error("Server", "Cannot listen on port %d", port)
 		return err
 	}
-	me.Listener = listener
+	svr.Listener = listener
 
-	me.Logger.Info("Server", "Listening on port %d", port)
+	svr.Logger.Info("Server", "Listening on port %d", port)
 
-	go me.server_loop()
+	go svr.server_loop()
 
 	return nil
 }
 
-func (me *TLSServer) Stop() {
-	me.ControlChannel <- CmdStop
+func (svr *TLSServer) Stop() {
+	svr.ControlChannel <- CmdStop
 }
 
-func (me *TLSServer) IsConnectedTo(id ch.Key) bool {
-	_, found := me.Connections[id]
+func (svr *TLSServer) IsConnectedTo(id ch.Key) bool {
+	_, found := svr.Connections[id]
 	return found
 }
 
-func (me *TLSServer) NotifyNewPeer(newPeer *Peer) {
-	for id, peer := range me.Connections {
+func (svr *TLSServer) NotifyNewPeer(newPeer *Peer) {
+	for id, peer := range svr.Connections {
 		if peer.ServerNetworkNode.ID != newPeer.ServerNetworkNode.ID && peer.Incoming {
-			me.Logger.Info("Server", "Notifying Existing Peer %02X of new Peer %02X (%s)", id, newPeer.ServerNetworkNode.ID, newPeer.ServerNetworkNode.HostAddr)
+			svr.Logger.Info("Server", "Notifying Existing Peer %02X of new Peer %02X (%s)", id, newPeer.ServerNetworkNode.ID, newPeer.ServerNetworkNode.HostAddr)
 			payload := packets.PeerListPacket{}
 			payload[newPeer.ServerNetworkNode.ID] = newPeer.ServerNetworkNode.HostAddr
 			peer.SendPacket(packets.NewPacket(packets.CMD_PEERLIST, payload))
@@ -126,21 +126,21 @@ func (me *TLSServer) NotifyNewPeer(newPeer *Peer) {
 
 // Distributed Key Value store methods
 
-func (me *TLSServer) SetKey(key string, value []byte, flags int16, expiry *time.Time) {
+func (svr *TLSServer) SetKey(key string, value []byte, flags int16, expiry *time.Time) {
 	keymd5 := ch.NewMD5Key(key)
-	nodes := me.ServerNode.GetNodesFor(keymd5, 3)
-	me.Logger.Debug("Server", "SetKey: %d peers for key %02X", len(nodes), keymd5)
+	nodes := svr.ServerNode.GetNodesFor(keymd5, 3)
+	svr.Logger.Debug("Server", "SetKey: %d peers for key %02X", len(nodes), keymd5)
 	for _, node := range nodes {
-		if node.ID == me.ServerNode.ID {
-			me.Logger.Debug("Server", "SetKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
+		if node.ID == svr.ServerNode.ID {
+			svr.Logger.Debug("Server", "SetKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
 			// Local set.
-			me.KVStore.Set(key, value, flags, expiry)
+			svr.KVStore.Set(key, value, flags, expiry)
 		} else {
-			me.Logger.Debug("Server", "SetKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
+			svr.Logger.Debug("Server", "SetKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
 
-			peer := me.Connections[node.ID]
+			peer := svr.Connections[node.ID]
 			if peer.State != PeerStateConnected {
-				me.Logger.Warn("Server", "SetKey: Peer for key %02X -> %02X (Remote) Unavailable", keymd5, node.ID)
+				svr.Logger.Warn("Server", "SetKey: Peer for key %02X -> %02X (Remote) Unavailable", keymd5, node.ID)
 				continue
 			}
 			// Remote Set.
@@ -159,20 +159,20 @@ func (me *TLSServer) SetKey(key string, value []byte, flags int16, expiry *time.
 	}
 }
 
-func (me *TLSServer) GetKey(key string) ([]byte, int16, bool) {
+func (svr *TLSServer) GetKey(key string) ([]byte, int16, bool) {
 	keymd5 := ch.NewMD5Key(key)
-	nodes := me.ServerNode.GetNodesFor(keymd5, 3)
+	nodes := svr.ServerNode.GetNodesFor(keymd5, 3)
 	for _, node := range nodes {
-		if node.ID == me.ServerNode.ID {
-			me.Logger.Debug("Server", "GetKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
+		if node.ID == svr.ServerNode.ID {
+			svr.Logger.Debug("Server", "GetKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
 			// Local set.
-			return me.KVStore.Get(key)
+			return svr.KVStore.Get(key)
 		} else {
-			me.Logger.Debug("Server", "GetKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
+			svr.Logger.Debug("Server", "GetKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
 
-			peer := me.Connections[node.ID]
+			peer := svr.Connections[node.ID]
 			if peer.State != PeerStateConnected {
-				me.Logger.Warn("Server", "GetKey: Peer for key %02X -> %02X (Remote) Unavailable", keymd5, node.ID)
+				svr.Logger.Warn("Server", "GetKey: Peer for key %02X -> %02X (Remote) Unavailable", keymd5, node.ID)
 				continue
 			}
 
@@ -191,31 +191,31 @@ func (me *TLSServer) GetKey(key string) ([]byte, int16, bool) {
 				switch reply.Command {
 				case packets.CMD_KVSTORE_ACK:
 					kvpacket := reply.Payload.(packets.KVStorePacket)
-					me.Logger.Debug("Server", "GetKey: Reply from Remote %s = %s", key, kvpacket.Data)
+					svr.Logger.Debug("Server", "GetKey: Reply from Remote %s = %s", key, kvpacket.Data)
 					return kvpacket.Data, kvpacket.Flags, true
 				case packets.CMD_KVSTORE_NOT_FOUND:
-					me.Logger.Debug("Server", "GetKey: Reply from Remote %s Not Found", key)
+					svr.Logger.Debug("Server", "GetKey: Reply from Remote %s Not Found", key)
 					return []byte{}, 0, false
 				default:
-					me.Logger.Warn("Server", "GetKey: Unknown Reply Command %d", reply.Command)
+					svr.Logger.Warn("Server", "GetKey: Unknown Reply Command %d", reply.Command)
 				}
 			} else {
-				me.Logger.Warn("Server", "GetKey: Reply Timeout")
+				svr.Logger.Warn("Server", "GetKey: Reply Timeout")
 			}
 		}
 	}
 	return []byte{}, 0, false
 }
 
-func (me *TLSServer) DeleteKey(key string) bool {
+func (svr *TLSServer) DeleteKey(key string) bool {
 	keymd5 := ch.NewMD5Key(key)
-	node := me.ServerNode.GetNodeFor(keymd5)
-	if node.ID == me.ServerNode.ID {
-		me.Logger.Debug("Server", "DeleteKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
+	node := svr.ServerNode.GetNodeFor(keymd5)
+	if node.ID == svr.ServerNode.ID {
+		svr.Logger.Debug("Server", "DeleteKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
 		// Local set.
-		return me.KVStore.Delete(key)
+		return svr.KVStore.Delete(key)
 	} else {
-		me.Logger.Debug("Server", "DeleteKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
+		svr.Logger.Debug("Server", "DeleteKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
 		// Remote Set.
 		payload := packets.KVStorePacket{
 			Command:  packets.CMD_KVSTORE_DELETE,
@@ -224,38 +224,38 @@ func (me *TLSServer) DeleteKey(key string) bool {
 			TargetID: node.ID,
 		}
 		packet := packets.NewPacket(packets.CMD_KVSTORE, payload)
-		reply, err := me.Connections[node.ID].SendPacketWaitReply(packet, 5*time.Second)
+		reply, err := svr.Connections[node.ID].SendPacketWaitReply(packet, 5*time.Second)
 
 		// Process reply or timeout
 		if err == nil {
 			switch reply.Command {
 			case packets.CMD_KVSTORE_ACK:
-				me.Logger.Debug("Server", "DeleteKey: Reply from Remote %s Deleted", key)
+				svr.Logger.Debug("Server", "DeleteKey: Reply from Remote %s Deleted", key)
 				return true
 			case packets.CMD_KVSTORE_NOT_FOUND:
-				me.Logger.Debug("Server", "DeleteKey: Reply from Remote %s Not Found", key)
+				svr.Logger.Debug("Server", "DeleteKey: Reply from Remote %s Not Found", key)
 				return false
 			default:
-				me.Logger.Warn("Server", "DeleteKey: Unknown Reply Command %d", reply.Command)
+				svr.Logger.Warn("Server", "DeleteKey: Unknown Reply Command %d", reply.Command)
 			}
 		} else {
-			me.Logger.Warn("Server", "DeleteKey: Reply Timeout")
+			svr.Logger.Warn("Server", "DeleteKey: Reply Timeout")
 		}
 	}
 	return false
 }
 
-func (me *TLSServer) server_loop() {
+func (svr *TLSServer) server_loop() {
 	// Connection Acceptor Loop
 	go func() {
 		for {
-			conn, err := me.Listener.Accept()
+			conn, err := svr.Listener.Accept()
 			if err != nil {
-				me.Logger.Error("Server", "Cannot Accept connection from %s: %s", conn.RemoteAddr(), err.Error())
+				svr.Logger.Error("Server", "Cannot Accept connection from %s: %s", conn.RemoteAddr(), err.Error())
 				break
 			}
-			me.Logger.Debug("Server", "Incoming Connection From %s", conn.RemoteAddr())
-			peer := NewConnectingPeer(me.Logger, me, conn.(*tls.Conn))
+			svr.Logger.Debug("Server", "Incoming Connection From %s", conn.RemoteAddr())
+			peer := NewConnectingPeer(svr.Logger, svr, conn.(*tls.Conn))
 			peer.Start()
 		}
 	}()
@@ -263,9 +263,9 @@ func (me *TLSServer) server_loop() {
 	// Control / Stop loop
 	for {
 		select {
-		case cmd := <-me.ControlChannel:
+		case cmd := <-svr.ControlChannel:
 			if cmd == CmdStop {
-				me.Logger.Debug("Server", "Stop Received, Shutting Down")
+				svr.Logger.Debug("Server", "Stop Received, Shutting Down")
 				goto end
 			}
 		}
@@ -273,13 +273,13 @@ func (me *TLSServer) server_loop() {
 
 end:
 
-	me.Logger.Debug("Server", "Closing Peer Connections")
-	for _, peer := range me.Connections {
+	svr.Logger.Debug("Server", "Closing Peer Connections")
+	for _, peer := range svr.Connections {
 		peer.Disconnect()
 	}
 
-	me.Logger.Info("Server", "Stopped")
-	me.StatusChannel <- StatusStopped
+	svr.Logger.Info("Server", "Stopped")
+	svr.StatusChannel <- StatusStopped
 }
 
 func init() {

@@ -19,6 +19,6 @@ type Field struct {
 	Table    *Table
 }
 
-func (me *Field) ToSQL() string {
-	return me.Name
+func (fd *Field) ToSQL() string {
+	return fd.Name
 }
