@@ -3,10 +3,10 @@ package main
 import (
 	// "github.com/tomdionysus/trinity/schema"
 	// "github.com/tomdionysus/trinity/sql"
-  "github.com/tomdionysus/trinity/network"
+	"github.com/tomdionysus/trinity/config"
+	"github.com/tomdionysus/trinity/kvstore"
+	"github.com/tomdionysus/trinity/network"
 	"github.com/tomdionysus/trinity/util"
-  "github.com/tomdionysus/trinity/config"
-  "github.com/tomdionysus/trinity/kvstore"
 	// "github.com/tomdionysus/trinity/packets"
 	"os"
 )
@@ -28,10 +28,10 @@ func main() {
 		logger.Fatal("Main", "Bad Configuration, Exiting")
 	}
 
-  // Key/Value Store
-  kv := kvstore.NewKVStore(logger)
-  kv.Init()
-  kv.Start()
+	// Key/Value Store
+	kv := kvstore.NewKVStore(logger)
+	kv.Init()
+	kv.Start()
 
 	// Banner
 	logger.Raw("Main", "---------------------------------------")
@@ -39,23 +39,23 @@ func main() {
 	logger.Raw("Main", "---------------------------------------")
 
 	// Config Debug
-	logger.Debug("Config","Nodes: %s", config.Nodes.String())
-	logger.Debug("Config","Certificate: %s", *config.Certificate)
-	logger.Debug("Config","Port: %d", *config.Port)
-	logger.Debug("Config","LogLevel: %s (%d)", *config.LogLevel, logger.LogLevel)
+	logger.Debug("Config", "Nodes: %s", config.Nodes.String())
+	logger.Debug("Config", "Certificate: %s", *config.Certificate)
+	logger.Debug("Config", "Port: %d", *config.Port)
+	logger.Debug("Config", "LogLevel: %s (%d)", *config.LogLevel, logger.LogLevel)
 
-  // CA
-  capool := network.NewCAPool(logger)
-  err := capool.LoadPEM(*config.CA)
-  if err != nil {
-    logger.Error("Main", "Cannot Load CA '%s': %s", *config.CA, err.Error())
-    os.Exit(-1)
-  }
-  logger.Debug("Main", "CA Certiticate Loaded") 
+	// CA
+	capool := network.NewCAPool(logger)
+	err := capool.LoadPEM(*config.CA)
+	if err != nil {
+		logger.Error("Main", "Cannot Load CA '%s': %s", *config.CA, err.Error())
+		os.Exit(-1)
+	}
+	logger.Debug("Main", "CA Certiticate Loaded")
 
 	// Server
 	svr := network.NewTLSServer(logger, capool, kv, *config.HostAddr)
-  logger.Info("Main","Trinity Node ID %02X", svr.ServerNode.ID)
+	logger.Info("Main", "Trinity Node ID %02X", svr.ServerNode.ID)
 
 	// Certificate
 	err = svr.LoadPEMCert(*config.Certificate, *config.Certificate)
@@ -63,7 +63,7 @@ func main() {
 		logger.Error("Main", "Cannot Load Certificate '%s': %s", *config.Certificate, err.Error())
 		os.Exit(-1)
 	}
-	logger.Debug("Main", "Cert Loaded")	
+	logger.Debug("Main", "Cert Loaded")
 
 	// Listen
 	err = svr.Listen(uint16(*config.Port))
@@ -72,31 +72,33 @@ func main() {
 		os.Exit(-1)
 	}
 
-  var memcache *network.MemcacheServer
+	var memcache *network.MemcacheServer
 
-  // Memcache
-  if *config.MemcacheEnabled {
-    memcache = network.NewMemcacheServer(logger, *config.MemcachePort, svr)
-    memcache.Init()
-    memcache.Start()
-  }
+	// Memcache
+	if *config.MemcacheEnabled {
+		memcache = network.NewMemcacheServer(logger, *config.MemcachePort, svr)
+		memcache.Init()
+		memcache.Start()
+	}
 
-  for _, remoteAddr := range config.Nodes {
-    svr.ConnectTo(remoteAddr)
-  }
+	for _, remoteAddr := range config.Nodes {
+		svr.ConnectTo(remoteAddr)
+	}
 
-  TrinityMainLoop(svr, logger)
+	TrinityMainLoop(svr, logger)
 
-  // Shutdown Memcache
-  if memcache!=nil { memcache.Stop() }
+	// Shutdown Memcache
+	if memcache != nil {
+		memcache.Stop()
+	}
 
-  // Shutdown Server and wait for close
-  svr.Stop()
-  _ = <-svr.StatusChannel
+	// Shutdown Server and wait for close
+	svr.Stop()
+	_ = <-svr.StatusChannel
 
-  // Shutdown KV Store
-  kv.Stop()
+	// Shutdown KV Store
+	kv.Stop()
 
-  logger.Info("Main", "Shutdown Complete, exiting")
-  os.Exit(0)
+	logger.Info("Main", "Shutdown Complete, exiting")
+	os.Exit(0)
 }

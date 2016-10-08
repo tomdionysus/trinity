@@ -1,12 +1,12 @@
 package packets
 
 import (
-  "testing"
-  "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestKVStorePacket(t *testing.T) {
-  inst := &KVStorePacket{}
+	inst := &KVStorePacket{}
 
-  assert.NotNil(t, inst)
-} 
+	assert.NotNil(t, inst)
+}

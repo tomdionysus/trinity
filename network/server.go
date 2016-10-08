@@ -1,55 +1,55 @@
 package network
 
 import (
-  "crypto/rand"
+	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
-	"net"
-	"fmt"
 	"encoding/gob"
 	"errors"
-	"time"
-	"github.com/tomdionysus/trinity/util"
+	"fmt"
+	ch "github.com/tomdionysus/consistenthash"
 	"github.com/tomdionysus/trinity/kvstore"
 	"github.com/tomdionysus/trinity/packets"
-	ch "github.com/tomdionysus/consistenthash"
+	"github.com/tomdionysus/trinity/util"
+	"net"
+	"time"
 )
 
 const (
-	CmdStop = iota
+	CmdStop       = iota
 	StatusStopped = iota
 )
 
 type TLSServer struct {
 	ServerNode *ch.ServerNode
 
-	CACertificate *tls.Certificate
-	Certificate *tls.Certificate
-	Logger *util.Logger
-	ControlChannel chan(int)
-	StatusChannel chan(int)
+	CACertificate  *tls.Certificate
+	Certificate    *tls.Certificate
+	Logger         *util.Logger
+	ControlChannel chan (int)
+	StatusChannel  chan (int)
 
-	CAPool *CAPool
+	CAPool  *CAPool
 	KVStore *kvstore.KVStore
 
 	SessionCache tls.ClientSessionCache
-	Connections map[[16]byte]*Peer
+	Connections  map[[16]byte]*Peer
 
 	Listener net.Listener
 }
 
 func NewTLSServer(logger *util.Logger, caPool *CAPool, kvStore *kvstore.KVStore, hostname string) *TLSServer {
 	inst := &TLSServer{
-		ServerNode: ch.NewServerNode(hostname),
-		Logger: logger,
-		ControlChannel: make(chan(int)),
-		StatusChannel: make(chan(int)),
-		Connections: map[[16]byte]*Peer{},
-		SessionCache: tls.NewLRUClientSessionCache(1024),
-		KVStore: kvStore,
-		CAPool: caPool,
+		ServerNode:     ch.NewServerNode(hostname),
+		Logger:         logger,
+		ControlChannel: make(chan (int)),
+		StatusChannel:  make(chan (int)),
+		Connections:    map[[16]byte]*Peer{},
+		SessionCache:   tls.NewLRUClientSessionCache(1024),
+		KVStore:        kvStore,
+		CAPool:         caPool,
 	}
-	return inst 
+	return inst
 }
 
 func (me *TLSServer) LoadPEMCert(certFile string, keyFile string) error {
@@ -67,13 +67,13 @@ func (me *TLSServer) LoadPEMCert(certFile string, keyFile string) error {
 func (me *TLSServer) ConnectTo(remoteAddr string) error {
 	if me.Listener.Addr().String() == remoteAddr {
 		er := "Cannot Connect to self"
-		me.Logger.Error("Server",er) 
+		me.Logger.Error("Server", er)
 		return errors.New(er)
 	}
 	peer := NewPeer(me.Logger, me, remoteAddr)
 	err := peer.Connect()
 	if err != nil {
-		me.Logger.Error("Server","Cannot Connect to Node %s: %s", remoteAddr, err.Error()) 
+		me.Logger.Error("Server", "Cannot Connect to Node %s: %s", remoteAddr, err.Error())
 		return err
 	}
 	peer.Start()
@@ -82,22 +82,22 @@ func (me *TLSServer) ConnectTo(remoteAddr string) error {
 
 func (me *TLSServer) Listen(port uint16) error {
 	config := tls.Config{
-		ClientCAs: me.CAPool.Pool,
+		ClientCAs:          me.CAPool.Pool,
 		ClientSessionCache: me.SessionCache,
-		ClientAuth: tls.RequireAndVerifyClientCert,
-		Certificates: []tls.Certificate{*me.Certificate},
-		CipherSuites: []uint16{ 0x0035, 0xc030, 0xc02c },
+		ClientAuth:         tls.RequireAndVerifyClientCert,
+		Certificates:       []tls.Certificate{*me.Certificate},
+		CipherSuites:       []uint16{0x0035, 0xc030, 0xc02c},
 	}
 
 	config.Rand = rand.Reader
 	listener, err := tls.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", port), &config)
 	if err != nil {
-		me.Logger.Error("Server","Cannot listen on port %d", port)
+		me.Logger.Error("Server", "Cannot listen on port %d", port)
 		return err
 	}
 	me.Listener = listener
 
-	me.Logger.Info("Server","Listening on port %d", port)
+	me.Logger.Info("Server", "Listening on port %d", port)
 
 	go me.server_loop()
 
@@ -114,10 +114,10 @@ func (me *TLSServer) IsConnectedTo(id ch.Key) bool {
 }
 
 func (me *TLSServer) NotifyNewPeer(newPeer *Peer) {
-	for id, peer := range me.Connections { 
+	for id, peer := range me.Connections {
 		if peer.ServerNetworkNode.ID != newPeer.ServerNetworkNode.ID && peer.Incoming {
-			me.Logger.Info("Server","Notifying Existing Peer %02X of new Peer %02X (%s)", id, newPeer.ServerNetworkNode.ID, newPeer.ServerNetworkNode.HostAddr)
-			payload :=packets.PeerListPacket{}
+			me.Logger.Info("Server", "Notifying Existing Peer %02X of new Peer %02X (%s)", id, newPeer.ServerNetworkNode.ID, newPeer.ServerNetworkNode.HostAddr)
+			payload := packets.PeerListPacket{}
 			payload[newPeer.ServerNetworkNode.ID] = newPeer.ServerNetworkNode.HostAddr
 			peer.SendPacket(packets.NewPacket(packets.CMD_PEERLIST, payload))
 		}
@@ -129,29 +129,29 @@ func (me *TLSServer) NotifyNewPeer(newPeer *Peer) {
 func (me *TLSServer) SetKey(key string, value []byte, flags int16, expiry *time.Time) {
 	keymd5 := ch.NewMD5Key(key)
 	nodes := me.ServerNode.GetNodesFor(keymd5, 3)
-	me.Logger.Debug("Server","SetKey: %d peers for key %02X", len(nodes), keymd5)
+	me.Logger.Debug("Server", "SetKey: %d peers for key %02X", len(nodes), keymd5)
 	for _, node := range nodes {
 		if node.ID == me.ServerNode.ID {
-			me.Logger.Debug("Server","SetKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
+			me.Logger.Debug("Server", "SetKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
 			// Local set.
 			me.KVStore.Set(key, value, flags, expiry)
 		} else {
-			me.Logger.Debug("Server","SetKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
-			
+			me.Logger.Debug("Server", "SetKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
+
 			peer := me.Connections[node.ID]
-			if peer.State != PeerStateConnected {				
-				me.Logger.Warn("Server","SetKey: Peer for key %02X -> %02X (Remote) Unavailable", keymd5, node.ID)
+			if peer.State != PeerStateConnected {
+				me.Logger.Warn("Server", "SetKey: Peer for key %02X -> %02X (Remote) Unavailable", keymd5, node.ID)
 				continue
 			}
 			// Remote Set.
 			payload := packets.KVStorePacket{
-				Command: packets.CMD_KVSTORE_SET,
-				Key: key,
-				KeyHash: keymd5,
-				Data: value,
+				Command:   packets.CMD_KVSTORE_SET,
+				Key:       key,
+				KeyHash:   keymd5,
+				Data:      value,
 				ExpiresAt: expiry,
-				Flags: flags,
-				TargetID: node.ID,
+				Flags:     flags,
+				TargetID:  node.ID,
 			}
 			packet := packets.NewPacket(packets.CMD_KVSTORE, payload)
 			peer.SendPacketWaitReply(packet, 5*time.Second)
@@ -164,43 +164,43 @@ func (me *TLSServer) GetKey(key string) ([]byte, int16, bool) {
 	nodes := me.ServerNode.GetNodesFor(keymd5, 3)
 	for _, node := range nodes {
 		if node.ID == me.ServerNode.ID {
-			me.Logger.Debug("Server","GetKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
+			me.Logger.Debug("Server", "GetKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
 			// Local set.
 			return me.KVStore.Get(key)
 		} else {
-			me.Logger.Debug("Server","GetKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
+			me.Logger.Debug("Server", "GetKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
 
 			peer := me.Connections[node.ID]
-			if peer.State != PeerStateConnected {				
-				me.Logger.Warn("Server","GetKey: Peer for key %02X -> %02X (Remote) Unavailable", keymd5, node.ID)
+			if peer.State != PeerStateConnected {
+				me.Logger.Warn("Server", "GetKey: Peer for key %02X -> %02X (Remote) Unavailable", keymd5, node.ID)
 				continue
 			}
 
 			// Remote Set.
 			payload := packets.KVStorePacket{
-				Command: packets.CMD_KVSTORE_GET,
-				Key: key,
-				KeyHash: keymd5,
+				Command:  packets.CMD_KVSTORE_GET,
+				Key:      key,
+				KeyHash:  keymd5,
 				TargetID: node.ID,
 			}
 			packet := packets.NewPacket(packets.CMD_KVSTORE, payload)
 			reply, err := peer.SendPacketWaitReply(packet, 5*time.Second)
-			
+
 			// Process reply or timeout
-			if err==nil {
+			if err == nil {
 				switch reply.Command {
 				case packets.CMD_KVSTORE_ACK:
 					kvpacket := reply.Payload.(packets.KVStorePacket)
-					me.Logger.Debug("Server","GetKey: Reply from Remote %s = %s", key, kvpacket.Data)
+					me.Logger.Debug("Server", "GetKey: Reply from Remote %s = %s", key, kvpacket.Data)
 					return kvpacket.Data, kvpacket.Flags, true
 				case packets.CMD_KVSTORE_NOT_FOUND:
-					me.Logger.Debug("Server","GetKey: Reply from Remote %s Not Found", key)
+					me.Logger.Debug("Server", "GetKey: Reply from Remote %s Not Found", key)
 					return []byte{}, 0, false
 				default:
-					me.Logger.Warn("Server","GetKey: Unknown Reply Command %d", reply.Command)
+					me.Logger.Warn("Server", "GetKey: Unknown Reply Command %d", reply.Command)
 				}
 			} else {
-				me.Logger.Warn("Server","GetKey: Reply Timeout")
+				me.Logger.Warn("Server", "GetKey: Reply Timeout")
 			}
 		}
 	}
@@ -211,35 +211,35 @@ func (me *TLSServer) DeleteKey(key string) bool {
 	keymd5 := ch.NewMD5Key(key)
 	node := me.ServerNode.GetNodeFor(keymd5)
 	if node.ID == me.ServerNode.ID {
-		me.Logger.Debug("Server","DeleteKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
+		me.Logger.Debug("Server", "DeleteKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
 		// Local set.
 		return me.KVStore.Delete(key)
 	} else {
-		me.Logger.Debug("Server","DeleteKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
+		me.Logger.Debug("Server", "DeleteKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
 		// Remote Set.
 		payload := packets.KVStorePacket{
-			Command: packets.CMD_KVSTORE_DELETE,
-			Key: key,
-			KeyHash: keymd5,
+			Command:  packets.CMD_KVSTORE_DELETE,
+			Key:      key,
+			KeyHash:  keymd5,
 			TargetID: node.ID,
 		}
 		packet := packets.NewPacket(packets.CMD_KVSTORE, payload)
 		reply, err := me.Connections[node.ID].SendPacketWaitReply(packet, 5*time.Second)
-		
+
 		// Process reply or timeout
-		if err==nil {
+		if err == nil {
 			switch reply.Command {
 			case packets.CMD_KVSTORE_ACK:
-				me.Logger.Debug("Server","DeleteKey: Reply from Remote %s Deleted", key)
+				me.Logger.Debug("Server", "DeleteKey: Reply from Remote %s Deleted", key)
 				return true
 			case packets.CMD_KVSTORE_NOT_FOUND:
-				me.Logger.Debug("Server","DeleteKey: Reply from Remote %s Not Found", key)
+				me.Logger.Debug("Server", "DeleteKey: Reply from Remote %s Not Found", key)
 				return false
 			default:
-				me.Logger.Warn("Server","DeleteKey: Unknown Reply Command %d", reply.Command)
+				me.Logger.Warn("Server", "DeleteKey: Unknown Reply Command %d", reply.Command)
 			}
 		} else {
-			me.Logger.Warn("Server","DeleteKey: Reply Timeout")
+			me.Logger.Warn("Server", "DeleteKey: Reply Timeout")
 		}
 	}
 	return false
@@ -251,10 +251,10 @@ func (me *TLSServer) server_loop() {
 		for {
 			conn, err := me.Listener.Accept()
 			if err != nil {
-				me.Logger.Error("Server","Cannot Accept connection from %s: %s", conn.RemoteAddr(), err.Error())
+				me.Logger.Error("Server", "Cannot Accept connection from %s: %s", conn.RemoteAddr(), err.Error())
 				break
 			}
-  		me.Logger.Debug("Server", "Incoming Connection From %s", conn.RemoteAddr())
+			me.Logger.Debug("Server", "Incoming Connection From %s", conn.RemoteAddr())
 			peer := NewConnectingPeer(me.Logger, me, conn.(*tls.Conn))
 			peer.Start()
 		}
@@ -263,26 +263,25 @@ func (me *TLSServer) server_loop() {
 	// Control / Stop loop
 	for {
 		select {
-			case cmd := <- me.ControlChannel:
-				if cmd == CmdStop {
-					me.Logger.Debug("Server","Stop Received, Shutting Down")
-					goto end
-				}
+		case cmd := <-me.ControlChannel:
+			if cmd == CmdStop {
+				me.Logger.Debug("Server", "Stop Received, Shutting Down")
+				goto end
+			}
 		}
 	}
-	
-	end:
 
-	me.Logger.Debug("Server","Closing Peer Connections")
+end:
+
+	me.Logger.Debug("Server", "Closing Peer Connections")
 	for _, peer := range me.Connections {
 		peer.Disconnect()
 	}
 
-	me.Logger.Info("Server","Stopped")
+	me.Logger.Info("Server", "Stopped")
 	me.StatusChannel <- StatusStopped
 }
 
 func init() {
 	gob.Register(ch.ServerNetworkNode{})
 }
-

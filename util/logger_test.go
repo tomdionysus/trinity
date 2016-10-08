@@ -1,13 +1,13 @@
 package util
 
 import (
-  "testing"
-  "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestNewLogger(t *testing.T) {
-  inst := NewLogger("error")
+	inst := NewLogger("error")
 
-  assert.NotNil(t, inst)
-  assert.Equal(t, uint(4), inst.LogLevel)
-} 
+	assert.NotNil(t, inst)
+	assert.Equal(t, uint(4), inst.LogLevel)
+}

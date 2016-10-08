@@ -1,15 +1,15 @@
 package config
 
 import (
-  "testing"
-  "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestNodeURLs(t *testing.T) {
-  inst := &NodeURLs{}
+	inst := &NodeURLs{}
 
-  inst.Set("OK")
-  assert.Equal(t, inst.String(), "[OK]")
-  inst.Set("ANDAGAIN")
-  assert.Equal(t, inst.String(), "[OK ANDAGAIN]")
+	inst.Set("OK")
+	assert.Equal(t, inst.String(), "[OK]")
+	inst.Set("ANDAGAIN")
+	assert.Equal(t, inst.String(), "[OK ANDAGAIN]")
 }

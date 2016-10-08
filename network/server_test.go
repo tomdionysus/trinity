@@ -1,12 +1,12 @@
 package network
 
 import (
-  "testing"
-  "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
-func TestTLSServer(t *testing.T) { 
-  inst := NewTLSServer(nil, nil, nil, "HOSTNAME")
+func TestTLSServer(t *testing.T) {
+	inst := NewTLSServer(nil, nil, nil, "HOSTNAME")
 
-  assert.NotNil(t, inst)
+	assert.NotNil(t, inst)
 }

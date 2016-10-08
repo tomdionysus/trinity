@@ -1,12 +1,12 @@
 package sql
 
 import (
-  "testing"
-  "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestSelect(t *testing.T) {
-  inst := &Select{}
+	inst := &Select{}
 
-  assert.NotNil(t, inst)
+	assert.NotNil(t, inst)
 }

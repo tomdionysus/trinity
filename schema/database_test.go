@@ -1,13 +1,13 @@
 package schema
 
 import (
-  "testing"
-  "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestNewDatabase(t *testing.T) {
-  inst := NewDatabase("DBNAME")
+	inst := NewDatabase("DBNAME")
 
-  assert.NotNil(t, inst)
-  assert.Equal(t, "DBNAME", inst.Name)
+	assert.NotNil(t, inst)
+	assert.Equal(t, "DBNAME", inst.Name)
 }
