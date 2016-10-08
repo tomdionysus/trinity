@@ -24,49 +24,49 @@ func NewLogger(logLevel string) *Logger {
 	return logger
 }
 
-func (me *Logger) Raw(component string, message string, args ...interface{}) {
-	me.printLog(component, "-----", message, args...)
+func (log *Logger) Raw(component string, message string, args ...interface{}) {
+	log.printLog(component, "-----", message, args...)
 }
 
-func (me *Logger) Fatal(component string, message string, args ...interface{}) {
-	me.printLog(component, "FATAL", message, args...)
+func (log *Logger) Fatal(component string, message string, args ...interface{}) {
+	log.printLog(component, "FATAL", message, args...)
 }
 
-func (me *Logger) Error(component string, message string, args ...interface{}) {
-	me.printLog(component, "ERROR", message, args...)
+func (log *Logger) Error(component string, message string, args ...interface{}) {
+	log.printLog(component, "ERROR", message, args...)
 }
 
-func (me *Logger) Warn(component string, message string, args ...interface{}) {
-	if me.LogLevel > 3 {
+func (log *Logger) Warn(component string, message string, args ...interface{}) {
+	if log.LogLevel > 3 {
 		return
 	}
-	me.printLog(component, "WARN ", message, args...)
+	log.printLog(component, "WARN ", message, args...)
 }
 
-func (me *Logger) Info(component string, message string, args ...interface{}) {
-	if me.LogLevel > 2 {
+func (log *Logger) Info(component string, message string, args ...interface{}) {
+	if log.LogLevel > 2 {
 		return
 	}
-	me.printLog(component, "INFO ", message, args...)
+	log.printLog(component, "INFO ", message, args...)
 }
 
-func (me *Logger) Debug(component string, message string, args ...interface{}) {
-	if me.LogLevel > 1 {
+func (log *Logger) Debug(component string, message string, args ...interface{}) {
+	if log.LogLevel > 1 {
 		return
 	}
-	me.printLog(component, "DEBUG", message, args...)
+	log.printLog(component, "DEBUG", message, args...)
 }
 
-func (me *Logger) printLog(component string, level string, message string, args ...interface{}) {
-	me.mutex.Lock()
-	defer me.mutex.Unlock()
+func (log *Logger) printLog(component string, level string, message string, args ...interface{}) {
+	log.mutex.Lock()
+	defer log.mutex.Unlock()
 
-	fmt.Printf("%s [%s] %s: ", me.getTimeUTCString(), level, component)
+	fmt.Printf("%s [%s] %s: ", log.getTimeUTCString(), level, component)
 	fmt.Printf(message, args...)
 	fmt.Print("\n")
 }
 
-func (me *Logger) getTimeUTCString() string {
+func (log *Logger) getTimeUTCString() string {
 	return time.Now().UTC().Format(time.RFC3339)
 }
 
