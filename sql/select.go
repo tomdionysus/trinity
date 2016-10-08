@@ -12,30 +12,30 @@ type Select struct {
 	Limit   Term
 }
 
-func (me *Select) ToSQL(wrap bool) string {
+func (sel *Select) ToSQL(wrap bool) string {
 	out := ""
 	if wrap {
 		out += "("
 	}
 	out += "SELECT "
-	if len(me.Results) > 0 {
-		out += GetStringWithSeperator(me.Results, ", ", false)
+	if len(sel.Results) > 0 {
+		out += GetStringWithSeperator(sel.Results, ", ", false)
 	}
-	if len(me.Sources) > 0 {
+	if len(sel.Sources) > 0 {
 		out += " FROM "
-		out += GetStringWithSeperator(me.Sources, ", ", false)
+		out += GetStringWithSeperator(sel.Sources, ", ", false)
 	}
-	if me.Where != nil {
+	if sel.Where != nil {
 		out += " WHERE "
-		out += me.Where.ToSQL(false)
+		out += sel.Where.ToSQL(false)
 	}
-	if me.Order != nil {
+	if sel.Order != nil {
 		out += " ORDER BY "
-		out += me.Order.ToSQL(false)
+		out += sel.Order.ToSQL(false)
 	}
-	if me.Limit != nil {
+	if sel.Limit != nil {
 		out += " LIMIT "
-		out += me.Limit.ToSQL(false)
+		out += sel.Limit.ToSQL(false)
 	}
 	if wrap {
 		out += ")"

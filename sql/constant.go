@@ -9,16 +9,16 @@ type Constant struct {
 	Value   string
 }
 
-func (me *Constant) ToSQL(wrap bool) string {
+func (cst *Constant) ToSQL(wrap bool) string {
 	out := ""
 	if wrap {
 		out += "("
 	}
-	switch me.SQLType {
+	switch cst.SQLType {
 	case schema.SQLVarChar:
-		out += "\"" + me.Value + "\""
+		out += "\"" + cst.Value + "\""
 	default:
-		out += me.Value
+		out += cst.Value
 	}
 	if wrap {
 		out += ")"

@@ -4,6 +4,6 @@ type CreateDatabase struct {
 	Name string
 }
 
-func (me *CreateDatabase) ToSQL(wrap bool) string {
-	return "CREATE DATABASE `" + me.Name + "`"
+func (cdb *CreateDatabase) ToSQL(wrap bool) string {
+	return "CREATE DATABASE `" + cdb.Name + "`"
 }

@@ -10,17 +10,17 @@ type FieldReference struct {
 	Alias  *string
 }
 
-func (me *FieldReference) ToSQL(wrap bool) string {
+func (fr *FieldReference) ToSQL(wrap bool) string {
 	out := ""
 	if wrap {
 		out += "("
 	}
-	if me.Source != nil {
-		out += me.Source.ToSQL(false) + "."
+	if fr.Source != nil {
+		out += fr.Source.ToSQL(false) + "."
 	}
-	out += me.Field.Name
-	if me.Alias != nil {
-		out += " AS " + *me.Alias
+	out += fr.Field.Name
+	if fr.Alias != nil {
+		out += " AS " + *fr.Alias
 	}
 	if wrap {
 		out += ")"

@@ -20,17 +20,17 @@ type Comparison struct {
 	Operation SQLOperation
 }
 
-func (me *Comparison) ToSQL(wrap bool) string {
+func (cmp *Comparison) ToSQL(wrap bool) string {
 	out := ""
 	if wrap {
 		out += "("
 	}
-	if me.A != nil {
-		out += me.A.ToSQL(false)
+	if cmp.A != nil {
+		out += cmp.A.ToSQL(false)
 	}
-	out += " " + me.GetOperationString() + " "
-	if me.B != nil {
-		out += me.B.ToSQL(false)
+	out += " " + cmp.GetOperationString() + " "
+	if cmp.B != nil {
+		out += cmp.B.ToSQL(false)
 	}
 	if wrap {
 		out += ")"
@@ -38,8 +38,8 @@ func (me *Comparison) ToSQL(wrap bool) string {
 	return out
 }
 
-func (me *Comparison) GetOperationString() string {
-	switch me.Operation {
+func (cmp *Comparison) GetOperationString() string {
+	switch cmp.Operation {
 	case OperationAND:
 		return "AND"
 	case OperationOR:

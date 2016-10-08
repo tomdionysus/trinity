@@ -9,10 +9,10 @@ type TableReference struct {
 	Alias *string
 }
 
-func (me *TableReference) ToSQL(wrap bool) string {
-	out := "`" + me.Table.Name + "`"
-	if me.Alias != nil {
-		out += " AS " + *me.Alias
+func (tblref *TableReference) ToSQL(wrap bool) string {
+	out := "`" + tblref.Table.Name + "`"
+	if tblref.Alias != nil {
+		out += " AS " + *tblref.Alias
 	}
 	return out
 }
