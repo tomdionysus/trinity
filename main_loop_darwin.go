@@ -31,7 +31,7 @@ func TrinityMainLoop(svr *network.TLSServer, logger *util.Logger) {
 			case os.Interrupt:
 				fallthrough
 			case syscall.SIGTERM:
-				logger.Info("Main", "Signal %d recieved, shutting down", sig)
+				logger.Info("Main", "Signal %d received, shutting down", sig)
 				return
 			}
 		}

@@ -43,10 +43,10 @@ func (me *Select) ToSQL(wrap bool) string {
 	return out
 }
 
-func GetStringWithSeperator(terms []Term, seperator string, wrap bool) string {
+func GetStringWithSeperator(terms []Term, separator string, wrap bool) string {
 	out := []string{}
 	for _, term := range terms {
 		out = append(out, term.ToSQL(wrap))
 	}
-	return strings.Join(out, seperator)
+	return strings.Join(out, separator)
 }
