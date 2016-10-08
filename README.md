@@ -4,6 +4,8 @@
 
 [![Build Status](https://travis-ci.org/tomdionysus/trinity.svg)](https://travis-ci.org/tomdionysus/trinity)
 [![Coverage Status](https://coveralls.io/repos/tomdionysus/trinity/badge.svg?branch=master&service=github)](https://coveralls.io/github/tomdionysus/trinity?branch=master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/tomdionysus/trinity)](https://goreportcard.com/report/github.com/tomdionysus/trinity)
+[![GoDoc](https://godoc.org/github.com/tomdionysus/trinity?status.svg)](https://godoc.org/github.com/tomdionysus/trinity)
 
 Trinity is a concept project for a relational database, designed from the ground up as a cloud system.
 
