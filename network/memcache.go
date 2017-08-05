@@ -84,7 +84,7 @@ func (mcs *MemcacheServer) handleConnection(addr string, conn net.Conn) {
 	for {
 		input, err := reader.ReadString('\n')
 		if err != nil {
-			if strings.HasSuffix(err.Error(),"use of closed network connection") {
+			if strings.HasSuffix(err.Error(), "use of closed network connection") {
 				mcs.Logger.Debug("Memcache", "[%s] -> Disconnected", addr)
 				break
 			}

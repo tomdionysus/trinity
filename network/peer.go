@@ -8,8 +8,8 @@ import (
 	"github.com/tomdionysus/trinity/util"
 	// "bytes"
 	"encoding/gob"
-	"time"
 	"strings"
+	"time"
 )
 
 const (
@@ -181,14 +181,14 @@ func (pr *Peer) process() {
 	var packet packets.Packet
 
 	for {
-	
+
 		// Read Command
 		err := pr.Reader.Decode(&packet)
 		if err != nil {
 			if err.Error() == "EOF" {
 				pr.Logger.Debug("Peer", "%02X: Peer Closed Connection", pr.ServerNetworkNode.ID)
 			} else {
-				if strings.HasSuffix(err.Error(),"use of closed network connection") {
+				if strings.HasSuffix(err.Error(), "use of closed network connection") {
 					pr.Logger.Debug("Peer", "%02X: Read After This Node Closed Connection", pr.ServerNetworkNode.ID)
 				} else {
 					pr.Logger.Error("Peer", "%02X: Error Reading: %s", pr.ServerNetworkNode.ID, err.Error())
@@ -198,7 +198,7 @@ func (pr *Peer) process() {
 		}
 		switch packet.Command {
 
-			// Packets in Connecting / Handshake
+		// Packets in Connecting / Handshake
 
 		case packets.CMD_HEARTBEAT:
 			pr.LastHeartbeat = time.Now()
@@ -228,7 +228,7 @@ func (pr *Peer) process() {
 			pr.State = PeerStateConnected
 			pr.LastHeartbeat = time.Now()
 
-				// Packets in Connected
+			// Packets in Connected
 
 		case packets.CMD_KVSTORE:
 			pr.Logger.Debug("Peer", "%02X: CMD_KVSTORE", pr.ServerNetworkNode.ID)
