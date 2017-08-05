@@ -41,7 +41,7 @@ func (mcs *MemcacheServer) Start() error {
 		return err
 	}
 	mcs.Listener = listener
-	mcs.Logger.Debug("Memcache", "Listening on port [%d]", mcs.Port)
+	mcs.Logger.Info("Memcache", "Listening on port [%d]", mcs.Port)
 	go func() {
 		for {
 			// Wait for a connection.
@@ -84,6 +84,10 @@ func (mcs *MemcacheServer) handleConnection(addr string, conn net.Conn) {
 	for {
 		input, err := reader.ReadString('\n')
 		if err != nil {
+			if strings.HasSuffix(err.Error(),"use of closed network connection") {
+				mcs.Logger.Debug("Memcache", "[%s] -> Disconnected", addr)
+				break
+			}
 			mcs.Logger.Error("Memcache", "[%s] -> Error: %s", addr, err.Error())
 		}
 		cmds := strings.Split(strings.Trim(input, " \n\r"), " ")

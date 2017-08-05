@@ -9,6 +9,7 @@ import (
 	// "bytes"
 	"encoding/gob"
 	"time"
+	"strings"
 )
 
 const (
@@ -180,19 +181,24 @@ func (pr *Peer) process() {
 	var packet packets.Packet
 
 	for {
+	
 		// Read Command
 		err := pr.Reader.Decode(&packet)
 		if err != nil {
 			if err.Error() == "EOF" {
 				pr.Logger.Debug("Peer", "%02X: Peer Closed Connection", pr.ServerNetworkNode.ID)
 			} else {
-				pr.Logger.Error("Peer", "%02X: Error Reading: %s", pr.ServerNetworkNode.ID, err.Error())
+				if strings.HasSuffix(err.Error(),"use of closed network connection") {
+					pr.Logger.Debug("Peer", "%02X: Read After This Node Closed Connection", pr.ServerNetworkNode.ID)
+				} else {
+					pr.Logger.Error("Peer", "%02X: Error Reading: %s", pr.ServerNetworkNode.ID, err.Error())
+				}
 			}
 			goto end
 		}
 		switch packet.Command {
 
-		// Packets in Connecting / Handshake
+			// Packets in Connecting / Handshake
 
 		case packets.CMD_HEARTBEAT:
 			pr.LastHeartbeat = time.Now()
@@ -205,19 +211,24 @@ func (pr *Peer) process() {
 			pr.ServerNetworkNode = &servernetworknode
 			pr.Server.Connections[pr.ServerNetworkNode.ID] = pr
 			pr.Logger.Debug("Peer", "%02X: CMD_DISTRIBUTION (%s)", pr.ServerNetworkNode.ID, pr.Connection.RemoteAddr())
-			redistribution, err := pr.Server.ServerNode.RegisterNode(pr.ServerNetworkNode)
+
+			if pr.Server.ServerNode.NodeRegistered(pr.ServerNetworkNode.ID) {
+				// Peer has previously registered
+				pr.Logger.Debug("Peer", "%02X: Node Already Registered", pr.ServerNetworkNode.ID)
+			} else {
+				// Peer is new
+				_, err := pr.Server.ServerNode.RegisterNode(pr.ServerNetworkNode)
+				if err != nil {
+					pr.Logger.Error("Peer", "%02X: Register Node Distribution Failed: %s", pr.ServerNetworkNode.ID, err.Error())
+					break
+				}
+				pr.Server.NotifyNewPeer(pr)
+			}
+
 			pr.State = PeerStateConnected
-			if err != nil {
-				pr.Logger.Error("Peer", "%02X: Register Node Distribution Failed: %s", pr.ServerNetworkNode.ID, err.Error())
-				break
-			}
-			if len(redistribution) > 0 {
-				// for _, redist := range redistribution {
-				//   pr.Logger.Debug("Peer","Redistribution: %02x - %02x :  %02X -> %02X", redist.Start, redist.End, redist.SourceNodeID, redist.DestinationNodeID)
-				// }
-			}
-			pr.Server.NotifyNewPeer(pr)
-		// Packets in Connected
+			pr.LastHeartbeat = time.Now()
+
+				// Packets in Connected
 
 		case packets.CMD_KVSTORE:
 			pr.Logger.Debug("Peer", "%02X: CMD_KVSTORE", pr.ServerNetworkNode.ID)
