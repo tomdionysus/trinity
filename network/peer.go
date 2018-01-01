@@ -12,6 +12,7 @@ import (
 	"time"
 )
 
+// Peer States
 const (
 	PeerStateDisconnected = iota
 	PeerStateConnecting   = iota
@@ -30,28 +31,44 @@ var PeerStateString map[uint]string = map[uint]string{
 	PeerStateDefib:        "PeerStateDefib",
 }
 
+// Peer is a representation of a remote trinity instance.
 type Peer struct {
 	Logger *util.Logger
+
+	// Server is the TLSServer that the peer is connected to (i.e. the TLSServer in this process)
 	Server *TLSServer
 
+	// Incoming is true if the peer connected to this server, false if we connected to it
 	Incoming bool
 
+	// Address is the hostname:port to connect to, or the hostname:port being connected
 	Address string
-	State   uint
 
-	Connection      *tls.Conn
+	// State is the State of the peer
+	State uint
+
+	// Connecton is the underlying TLS secured connection
+	Connection *tls.Conn
+
+	// HeartbeatTicker is the ticker used to generate heartbeat packets (every 1s)
 	HeartbeatTicker *time.Ticker
 
+	// Writer is the stream for sending to the peer
 	Writer *gob.Encoder
+	// Reader is the stream for reading from the peer
 	Reader *gob.Decoder
 
+	// LastHeartbeat is when the last heartbeat packet was received
 	LastHeartbeat time.Time
 
+	// ServerNetworkNode is the consisten hash node associated with the peer
 	ServerNetworkNode *consistenthash.ServerNetworkNode
 
+	// Replies contains the current outstanding requests to the peer
 	Replies map[[16]byte]chan (*packets.Packet)
 }
 
+// NewPeer returns a new Peer with the specified logger, server and address
 func NewPeer(logger *util.Logger, server *TLSServer, address string) *Peer {
 	inst := &Peer{
 		Logger:            logger,
@@ -65,6 +82,7 @@ func NewPeer(logger *util.Logger, server *TLSServer, address string) *Peer {
 	return inst
 }
 
+// NewConnectingPeer returns a new Peer with the specified logger, server, and connection.
 func NewConnectingPeer(logger *util.Logger, server *TLSServer, connection *tls.Conn) *Peer {
 	inst := NewPeer(logger, server, connection.RemoteAddr().String())
 	inst.Connection = connection
@@ -73,6 +91,7 @@ func NewConnectingPeer(logger *util.Logger, server *TLSServer, connection *tls.C
 	return inst
 }
 
+// Connect attempts to connect to the trinity instance at the configred Address
 func (pr *Peer) Connect() error {
 	pr.Incoming = false
 	pr.State = PeerStateConnecting
@@ -96,6 +115,7 @@ func (pr *Peer) Connect() error {
 	return nil
 }
 
+// Disconnect disconnects the remote trinity instance and removes the peer from the TLSServer connections
 func (pr *Peer) Disconnect() {
 	if pr.State != PeerStateDisconnected {
 		pr.State = PeerStateDisconnected
@@ -111,9 +131,10 @@ func (pr *Peer) Disconnect() {
 	}
 }
 
+// Start processes the TLS handshake and registration protocol once connected
 func (pr *Peer) Start() error {
 	if pr.State != PeerStateHandshake {
-		pr.Logger.Error("Peer", "Cannot Start Client, Handshake not ready")
+		pr.Logger.Error("Peer", "Cannot Start Peer, Handshake not ready")
 		return errors.New("Handshake not ready")
 	}
 	err := pr.Connection.Handshake()
@@ -148,7 +169,7 @@ func (pr *Peer) Start() error {
 	return nil
 }
 
-// Ping the Peer every second.
+// heartbeat pings the Peer every second.
 func (pr *Peer) heartbeat() {
 	pr.HeartbeatTicker = time.NewTicker(time.Second)
 
@@ -171,16 +192,15 @@ func (pr *Peer) heartbeat() {
 			}
 		case PeerStateDefib:
 			if time.Now().After(pr.LastHeartbeat.Add(10 * time.Second)) {
-				pr.Logger.Warn("Peer", "%02X: Peer DOA (Defib for 5 seconds, disconnecting)", pr.ServerNetworkNode.ID)
+				pr.Logger.Warn("Peer", "%02X: Peer DOA (Defib for 5 seconds), disconnecting", pr.ServerNetworkNode.ID)
 				pr.Disconnect()
 				return
 			}
 		}
-
 	}
-
 }
 
+// process continually reads from the Pere input stream and processes packet commands.
 func (pr *Peer) process() {
 
 	var packet packets.Packet
