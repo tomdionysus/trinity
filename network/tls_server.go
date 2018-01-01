@@ -12,14 +12,21 @@ import (
 	"github.com/tomdionysus/trinity/packets"
 	"github.com/tomdionysus/trinity/util"
 	"net"
+	"sync"
 	"time"
 )
 
+// Commands
 const (
-	CmdStop       = iota
+	CommandStop = iota
+)
+
+// Status
+const (
 	StatusStopped = iota
 )
 
+// TLSServer represents the running Trinity instance, and is the highest level type in the stack.
 type TLSServer struct {
 	ServerNode *ch.ServerNode
 
@@ -33,25 +40,30 @@ type TLSServer struct {
 	KVStore *kvstore.KVStore
 
 	SessionCache tls.ClientSessionCache
-	Connections  map[[16]byte]*Peer
+
+	connections      map[[16]byte]*Peer
+	connectionsMutex sync.Mutex
 
 	Listener net.Listener
 }
 
+// NewTLSServer creates and returns a new TLSServer with the given logger, CA Pool, KV Store and host name
 func NewTLSServer(logger *util.Logger, caPool *CAPool, kvStore *kvstore.KVStore, hostname string) *TLSServer {
 	inst := &TLSServer{
 		ServerNode:     ch.NewServerNode(hostname),
 		Logger:         logger,
 		ControlChannel: make(chan (int)),
 		StatusChannel:  make(chan (int)),
-		Connections:    map[[16]byte]*Peer{},
 		SessionCache:   tls.NewLRUClientSessionCache(1024),
 		KVStore:        kvStore,
 		CAPool:         caPool,
+
+		connections: map[[16]byte]*Peer{},
 	}
 	return inst
 }
 
+// LoadPEMCert loads the given PEM file(s) as this instance's certificate. certFile and keyFile may be the same file.
 func (svr *TLSServer) LoadPEMCert(certFile string, keyFile string) error {
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err == nil {
@@ -64,6 +76,7 @@ func (svr *TLSServer) LoadPEMCert(certFile string, keyFile string) error {
 	return err
 }
 
+// ConnectTo attempts to connect to another Trinity instance and join its cluster.
 func (svr *TLSServer) ConnectTo(remoteAddr string) error {
 	if svr.Listener.Addr().String() == remoteAddr {
 		er := "Cannot Connect to self"
@@ -80,6 +93,7 @@ func (svr *TLSServer) ConnectTo(remoteAddr string) error {
 	return nil
 }
 
+// Listen begins listening for other Trinity instances connecting on the given port.
 func (svr *TLSServer) Listen(port uint16) error {
 	config := tls.Config{
 		ClientCAs:          svr.CAPool.Pool,
@@ -104,31 +118,66 @@ func (svr *TLSServer) Listen(port uint16) error {
 	return nil
 }
 
+// Stop causes the instance to stop listening, close all connections, and shut down.
 func (svr *TLSServer) Stop() {
-	svr.ControlChannel <- CmdStop
+	svr.ControlChannel <- CommandStop
 }
 
-func (svr *TLSServer) IsConnectedTo(id ch.Key) bool {
-	_, found := svr.Connections[id]
-	return found
+// Connections Concurrent Map
+
+// ConnectionSet assigns the given Instance ID to the given peer
+func (svr *TLSServer) ConnectionSet(id ch.Key, peer *Peer) {
+	svr.connectionsMutex.Lock()
+	svr.connections[id] = peer
+	svr.connectionsMutex.Unlock()
 }
 
+// ConnectionGet returns the peer for the given ID, and whether that ID was found.
+func (svr *TLSServer) ConnectionGet(id ch.Key) (*Peer, bool) {
+	svr.connectionsMutex.Lock()
+	peer, found := svr.connections[id]
+	svr.connectionsMutex.Unlock()
+	return peer, found
+}
+
+// ConnectionClear clears the peer for the given Instance ID.
+func (svr *TLSServer) ConnectionClear(id ch.Key) {
+	svr.connectionsMutex.Lock()
+	delete(svr.connections, id)
+	svr.connectionsMutex.Unlock()
+}
+
+// Connections returns a current copy of all connections.
+func (svr *TLSServer) Connections() map[[16]byte]*Peer {
+	svr.connectionsMutex.Lock()
+	cpy := map[[16]byte]*Peer{}
+
+	for k, v := range svr.connections {
+		cpy[k] = v
+	}
+
+	svr.connectionsMutex.Unlock()
+	return cpy
+}
+
+// NotifyAllPeers sends CMD_PEERLIST to all connected peers with a list of all the peers we know about.
 func (svr *TLSServer) NotifyAllPeers() {
 	svr.Logger.Debug("Server", "Notifying All Peers")
 
-	for id, peer := range svr.Connections {
+	currentConns := svr.Connections()
+
+	for id, peer := range currentConns {
 		payload := packets.PeerListPacket{}
-		for listId, listPeer := range svr.Connections {
-			if listId!=id {
+		for listId, listPeer := range currentConns {
+			if listId != id {
 				payload[listId] = listPeer.ServerNetworkNode.HostAddr
-		  }
+			}
 		}
 		peer.SendPacket(packets.NewPacket(packets.CMD_PEERLIST, payload))
 	}
 }
 
-// Distributed Key Value store methods
-
+// SetKey sets the given key to the given value in the cluster.
 func (svr *TLSServer) SetKey(key string, value []byte, flags int16, expiry *time.Time) {
 	keymd5 := ch.NewMD5Key(key)
 	nodes := svr.ServerNode.GetNodesFor(keymd5, 3)
@@ -141,7 +190,7 @@ func (svr *TLSServer) SetKey(key string, value []byte, flags int16, expiry *time
 		} else {
 			svr.Logger.Debug("Server", "SetKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
 
-			peer := svr.Connections[node.ID]
+			peer, _ := svr.ConnectionGet(node.ID)
 			if peer.State != PeerStateConnected {
 				svr.Logger.Warn("Server", "SetKey: Peer for key %02X -> %02X (Remote) Unavailable", keymd5, node.ID)
 				continue
@@ -162,6 +211,7 @@ func (svr *TLSServer) SetKey(key string, value []byte, flags int16, expiry *time
 	}
 }
 
+// GetKey returns a value for the given key in the cluster, and if that key was found
 func (svr *TLSServer) GetKey(key string) ([]byte, int16, bool) {
 	keymd5 := ch.NewMD5Key(key)
 	nodes := svr.ServerNode.GetNodesFor(keymd5, 3)
@@ -173,7 +223,7 @@ func (svr *TLSServer) GetKey(key string) ([]byte, int16, bool) {
 		} else {
 			svr.Logger.Debug("Server", "GetKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
 
-			peer := svr.Connections[node.ID]
+			peer, _ := svr.ConnectionGet(node.ID)
 			if peer.State != PeerStateConnected {
 				svr.Logger.Warn("Server", "GetKey: Peer for key %02X -> %02X (Remote) Unavailable", keymd5, node.ID)
 				continue
@@ -210,6 +260,7 @@ func (svr *TLSServer) GetKey(key string) ([]byte, int16, bool) {
 	return []byte{}, 0, false
 }
 
+// DeleteKey clears the given key in the cluster.
 func (svr *TLSServer) DeleteKey(key string) bool {
 	keymd5 := ch.NewMD5Key(key)
 	node := svr.ServerNode.GetNodeFor(keymd5)
@@ -226,8 +277,10 @@ func (svr *TLSServer) DeleteKey(key string) bool {
 			KeyHash:  keymd5,
 			TargetID: node.ID,
 		}
+
 		packet := packets.NewPacket(packets.CMD_KVSTORE, payload)
-		reply, err := svr.Connections[node.ID].SendPacketWaitReply(packet, 5*time.Second)
+		peer, _ := svr.ConnectionGet(node.ID)
+		reply, err := peer.SendPacketWaitReply(packet, 5*time.Second)
 
 		// Process reply or timeout
 		if err == nil {
@@ -248,8 +301,10 @@ func (svr *TLSServer) DeleteKey(key string) bool {
 	return false
 }
 
+// server_loop starts the main server runloop, accepting connections. The peers have individual runloops which handle
+// incoming traffic.
 func (svr *TLSServer) server_loop() {
-	// Connection Acceptor Loop
+
 	go func() {
 		for {
 			conn, err := svr.Listener.Accept()
@@ -267,7 +322,8 @@ func (svr *TLSServer) server_loop() {
 	for {
 		select {
 		case cmd := <-svr.ControlChannel:
-			if cmd == CmdStop {
+			switch cmd {
+			case CommandStop:
 				svr.Logger.Debug("Server", "Stop Received, Shutting Down")
 				goto end
 			}
@@ -277,7 +333,7 @@ func (svr *TLSServer) server_loop() {
 end:
 
 	svr.Logger.Debug("Server", "Closing Peer Connections")
-	for _, peer := range svr.Connections {
+	for _, peer := range svr.Connections() {
 		peer.Disconnect()
 	}
 
@@ -285,6 +341,7 @@ end:
 	svr.StatusChannel <- StatusStopped
 }
 
+// init registers ServerNetworkNode with GOB for packet transfer
 func init() {
 	gob.Register(ch.ServerNetworkNode{})
 }

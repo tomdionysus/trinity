@@ -30,8 +30,8 @@ func NewConfig() *Config {
 	inst.HostAddr = flag.String("hostaddr", "", "Advertisted hostname:port")
 	flag.Parse()
 
-	if *inst.HostAddr=="" {
-		s:=fmt.Sprintf("localhost:%d", *inst.Port)
+	if *inst.HostAddr == "" {
+		s := fmt.Sprintf("localhost:%d", *inst.Port)
 		inst.HostAddr = &s
 	}
 

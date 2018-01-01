@@ -107,7 +107,7 @@ func (pr *Peer) Disconnect() {
 			pr.Connection.Close()
 		}
 		pr.Logger.Info("Peer", "%02X: Disconnected", pr.ServerNetworkNode.ID)
-		delete(pr.Server.Connections, pr.ServerNetworkNode.ID)
+		pr.Server.ConnectionClear(pr.ServerNetworkNode.ID)
 	}
 }
 
@@ -209,15 +209,22 @@ func (pr *Peer) process() {
 			pr.LastHeartbeat = time.Now()
 
 		case packets.CMD_DISTRIBUTION:
+			// CMD_DISTRIBUTION contains the ID and the CH distribution of the peer. It is the last stage of the
+			// connection establishment protocol, and a peer is not PeerStateConnected until it is received and verified
+
+			// CMD_DISTRIBUTION should only be recieved once, right at the start, for both incoming and outgoing
+			// connections.
 			if pr.ServerNetworkNode != nil {
 				pr.Logger.Warn("Peer", "%02X: CMD_DISTRIBUTION received from registered peer", pr.ServerNetworkNode.ID)
 				break
 			}
 			servernetworknode := packet.Payload.(consistenthash.ServerNetworkNode)
 			pr.ServerNetworkNode = &servernetworknode
-			pr.Server.Connections[pr.ServerNetworkNode.ID] = pr
+			pr.Server.ConnectionSet(pr.ServerNetworkNode.ID, pr)
 			pr.Logger.Debug("Peer", "%02X: CMD_DISTRIBUTION (%s)", pr.ServerNetworkNode.ID, pr.Connection.RemoteAddr())
 
+			// Because of misconfiguration, complex network topologies, or another faulty peer, it's possible that
+			// this connection is actually from ourselves. If so, shut it down.
 			if pr.Server.ServerNode.ID == pr.ServerNetworkNode.ID {
 				if !pr.Incoming {
 					pr.Logger.Warn("Peer", "%02X: The outgoing connection connected back to this node - disconnecting (%s)", pr.ServerNetworkNode.ID, pr.Connection.RemoteAddr())
@@ -228,6 +235,7 @@ func (pr *Peer) process() {
 				break
 			}
 
+			// The connection may be from a node we're already connected to, If so, shut it down.
 			if pr.Server.ServerNode.NodeRegistered(pr.ServerNetworkNode.ID) {
 				// Peer has previously registered
 				pr.Logger.Debug("Peer", "%02X: Node Already Registered", pr.ServerNetworkNode.ID)
@@ -242,7 +250,7 @@ func (pr *Peer) process() {
 
 			pr.State = PeerStateConnected
 			pr.LastHeartbeat = time.Now()
-			
+
 			pr.Server.NotifyAllPeers()
 
 		// Packets in Connected
@@ -263,15 +271,11 @@ func (pr *Peer) process() {
 			peers := packet.Payload.(packets.PeerListPacket)
 			pr.Logger.Debug("Peer", "%02X: CMD_PEERLIST (%d Peers)", pr.ServerNetworkNode.ID, len(peers))
 
-			for id, _ :=range pr.Server.Connections {
-					pr.Logger.Debug("Peer", "CMD_PEERLIST Listing Existing Peer %02X",id)
-			}
-
 			for id, k := range peers {
 				if pr.Server.ServerNode.ID == id {
 					pr.Logger.Warn("Peer", "%02X: - Notified us of ourselves (%02X).", pr.ServerNetworkNode.ID, id)
 				} else {
-					if !pr.Server.IsConnectedTo(id) {
+					if _, connected := pr.Server.ConnectionGet(id); !connected {
 						pr.Logger.Debug("Peer", "%02X: - Notified %02X - Connecting New Peer (%s)", pr.ServerNetworkNode.ID, id, k)
 						pr.Server.ConnectTo(k)
 					} else {
