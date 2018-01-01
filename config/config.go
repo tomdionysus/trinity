@@ -27,7 +27,7 @@ func NewConfig() *Config {
 	inst.Port = flag.Int("port", 13531, "Cluster port")
 	inst.MemcacheEnabled = flag.Bool("memcache", false, "Enable Memcache Server")
 	inst.MemcachePort = flag.Int("memcacheport", 11211, "Memcache port")
-	inst.HostAddr = flag.String("hostaddr", "", "Advertisted hostname:port")
+	inst.HostAddr = flag.String("hostaddr", "", "Advertised hostname:port")
 	flag.Parse()
 
 	if *inst.HostAddr == "" {

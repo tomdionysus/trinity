@@ -125,7 +125,6 @@ func (mcs *MemcacheServer) handleCommand(addr string, reader *bufio.Reader, writ
 	default:
 		writer.WriteString("ERROR\r\n")
 		writer.Flush()
-		return false
 	}
 
 	return false
