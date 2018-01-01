@@ -10,7 +10,7 @@ import (
 // The packet contains the ID and the CH distribution of the peer. It is the last stage of the
 // connection establishment protocol, and a peer is not PeerStateConnected until this packet is received and verified.
 func (peer *Peer) process_CMD_DISTRIBUTION(packet packets.Packet) {
-	// CMD_DISTRIBUTION should only be recieved once, right at the start, for both incoming and outgoing
+	// CMD_DISTRIBUTION should only be received once, right at the start, for both incoming and outgoing
 	// connections.
 	if peer.ServerNetworkNode != nil {
 		peer.Logger.Warn("Peer", "%02X: CMD_DISTRIBUTION received from registered peer", peer.ServerNetworkNode.ID)
