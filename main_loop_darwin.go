@@ -14,7 +14,7 @@ func TrinityMainLoop(svr *network.TLSServer, logger *util.Logger) {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	signal.Notify(c, syscall.SIGTERM)
-	signal.Notify(c, syscall.SIGINFO) // syscall.SIGINFO doesn"t exist in linux go.
+	signal.Notify(c, syscall.SIGINFO) // syscall.SIGINFO doesn't exist in linux go.
 
 	iostatus := map[bool]string{true: "Incoming", false: "Outgoing"}
 	// Wait for SIGINT
