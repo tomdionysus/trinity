@@ -221,7 +221,7 @@ func (peer *Peer) process() {
 			}
 			goto end
 		}
-		
+
 		switch packet.Command {
 
 		// Packets in Connecting / Handshake
