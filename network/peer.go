@@ -97,7 +97,7 @@ func (pr *Peer) Connect() error {
 }
 
 func (pr *Peer) Disconnect() {
-	if pr.State == PeerStateConnected {
+	if pr.State != PeerStateDisconnected {
 		pr.State = PeerStateDisconnected
 		pr.Server.ServerNode.DeregisterNode(pr.ServerNetworkNode)
 		if pr.HeartbeatTicker != nil {
@@ -106,8 +106,8 @@ func (pr *Peer) Disconnect() {
 		if pr.Connection != nil {
 			pr.Connection.Close()
 		}
-		delete(pr.Server.Connections, pr.ServerNetworkNode.ID)
 		pr.Logger.Info("Peer", "%02X: Disconnected", pr.ServerNetworkNode.ID)
+		delete(pr.Server.Connections, pr.ServerNetworkNode.ID)
 	}
 }
 
@@ -129,7 +129,12 @@ func (pr *Peer) Start() error {
 		return errors.New("Peer sent no certificates")
 	}
 	sub := state.PeerCertificates[0].Subject.CommonName
-	pr.Logger.Info("Peer", "Connected to %s (%s) [%s]", pr.Connection.RemoteAddr(), sub, Ciphers[pr.Connection.ConnectionState().CipherSuite])
+
+	if pr.Incoming {
+		pr.Logger.Info("Peer", "Outgoing Connection to %s (%s) [%s]", pr.Connection.RemoteAddr(), sub, Ciphers[pr.Connection.ConnectionState().CipherSuite])
+	} else {
+		pr.Logger.Info("Peer", "Incoming Connection from %s (%s) [%s]", pr.Connection.RemoteAddr(), sub, Ciphers[pr.Connection.ConnectionState().CipherSuite])
+	}
 
 	pr.Reader = gob.NewDecoder(pr.Connection)
 	pr.Writer = gob.NewEncoder(pr.Connection)
@@ -202,6 +207,7 @@ func (pr *Peer) process() {
 
 		case packets.CMD_HEARTBEAT:
 			pr.LastHeartbeat = time.Now()
+
 		case packets.CMD_DISTRIBUTION:
 			if pr.ServerNetworkNode != nil {
 				pr.Logger.Warn("Peer", "%02X: CMD_DISTRIBUTION received from registered peer", pr.ServerNetworkNode.ID)
@@ -211,6 +217,16 @@ func (pr *Peer) process() {
 			pr.ServerNetworkNode = &servernetworknode
 			pr.Server.Connections[pr.ServerNetworkNode.ID] = pr
 			pr.Logger.Debug("Peer", "%02X: CMD_DISTRIBUTION (%s)", pr.ServerNetworkNode.ID, pr.Connection.RemoteAddr())
+
+			if pr.Server.ServerNode.ID == pr.ServerNetworkNode.ID {
+				if !pr.Incoming {
+					pr.Logger.Warn("Peer", "%02X: The outgoing connection connected back to this node - disconnecting (%s)", pr.ServerNetworkNode.ID, pr.Connection.RemoteAddr())
+				} else {
+					pr.Logger.Debug("Peer", "%02X: Incoming connection is from this node - disconnecting (%s)", pr.ServerNetworkNode.ID, pr.Connection.RemoteAddr())
+				}
+				pr.Disconnect()
+				break
+			}
 
 			if pr.Server.ServerNode.NodeRegistered(pr.ServerNetworkNode.ID) {
 				// Peer has previously registered
@@ -222,40 +238,54 @@ func (pr *Peer) process() {
 					pr.Logger.Error("Peer", "%02X: Register Node Distribution Failed: %s", pr.ServerNetworkNode.ID, err.Error())
 					break
 				}
-				pr.Server.NotifyNewPeer(pr)
 			}
 
 			pr.State = PeerStateConnected
 			pr.LastHeartbeat = time.Now()
+			
+			pr.Server.NotifyAllPeers()
 
-			// Packets in Connected
+		// Packets in Connected
 
 		case packets.CMD_KVSTORE:
 			pr.Logger.Debug("Peer", "%02X: CMD_KVSTORE", pr.ServerNetworkNode.ID)
 			pr.handleKVStorePacket(&packet)
+
 		case packets.CMD_KVSTORE_ACK:
 			pr.Logger.Debug("Peer", "%02X: CMD_KVSTORE_ACK", pr.ServerNetworkNode.ID)
 			pr.handleReply(&packet)
+
 		case packets.CMD_KVSTORE_NOT_FOUND:
 			pr.Logger.Debug("Peer", "%02X: CMD_KVSTORE_NOT_FOUND", pr.ServerNetworkNode.ID)
 			pr.handleReply(&packet)
+
 		case packets.CMD_PEERLIST:
 			peers := packet.Payload.(packets.PeerListPacket)
 			pr.Logger.Debug("Peer", "%02X: CMD_PEERLIST (%d Peers)", pr.ServerNetworkNode.ID, len(peers))
+
+			for id, _ :=range pr.Server.Connections {
+					pr.Logger.Debug("Peer", "CMD_PEERLIST Listing Existing Peer %02X",id)
+			}
+
 			for id, k := range peers {
-				if pr.Server.Listener.Addr().String() == k {
-					pr.Logger.Warn("Peer", "%02X: - Peer %02X (%s) notified us of ourselves.", id, pr.ServerNetworkNode.ID, k)
+				if pr.Server.ServerNode.ID == id {
+					pr.Logger.Warn("Peer", "%02X: - Notified us of ourselves (%02X).", pr.ServerNetworkNode.ID, id)
 				} else {
 					if !pr.Server.IsConnectedTo(id) {
-						pr.Logger.Debug("Peer", "%02X: - Connecting New Peer %02X (%s)", id, pr.ServerNetworkNode.ID, k)
+						pr.Logger.Debug("Peer", "%02X: - Notified %02X - Connecting New Peer (%s)", pr.ServerNetworkNode.ID, id, k)
 						pr.Server.ConnectTo(k)
 					} else {
-						pr.Logger.Debug("Peer", "%02X: - Already Connected to Peer %02X (%s)", id, pr.ServerNetworkNode.ID, k)
+						pr.Logger.Debug("Peer", "%02X: - Notified %02X - Already Connected to Peer (%s)", pr.ServerNetworkNode.ID, id, k)
 					}
 				}
 			}
+
 		default:
 			pr.Logger.Warn("Peer", "%02X: Unknown Packet Command %d", pr.ServerNetworkNode.ID, packet.Command)
+		}
+
+		if pr.State == PeerStateDisconnected {
+			break
 		}
 	}
 end:

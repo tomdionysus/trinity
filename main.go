@@ -42,6 +42,7 @@ func main() {
 	logger.Debug("Config", "Nodes: %s", config.Nodes.String())
 	logger.Debug("Config", "Certificate: %s", *config.Certificate)
 	logger.Debug("Config", "Port: %d", *config.Port)
+	logger.Debug("Config", "Advertise: %s", *config.HostAddr)
 	logger.Debug("Config", "LogLevel: %s (%d)", *config.LogLevel, logger.LogLevel)
 
 	// CA

@@ -113,14 +113,17 @@ func (svr *TLSServer) IsConnectedTo(id ch.Key) bool {
 	return found
 }
 
-func (svr *TLSServer) NotifyNewPeer(newPeer *Peer) {
+func (svr *TLSServer) NotifyAllPeers() {
+	svr.Logger.Debug("Server", "Notifying All Peers")
+
 	for id, peer := range svr.Connections {
-		if peer.ServerNetworkNode.ID != newPeer.ServerNetworkNode.ID && peer.Incoming {
-			svr.Logger.Info("Server", "Notifying Existing Peer %02X of new Peer %02X (%s)", id, newPeer.ServerNetworkNode.ID, newPeer.ServerNetworkNode.HostAddr)
-			payload := packets.PeerListPacket{}
-			payload[newPeer.ServerNetworkNode.ID] = newPeer.ServerNetworkNode.HostAddr
-			peer.SendPacket(packets.NewPacket(packets.CMD_PEERLIST, payload))
+		payload := packets.PeerListPacket{}
+		for listId, listPeer := range svr.Connections {
+			if listId!=id {
+				payload[listId] = listPeer.ServerNetworkNode.HostAddr
+		  }
 		}
+		peer.SendPacket(packets.NewPacket(packets.CMD_PEERLIST, payload))
 	}
 }
 
@@ -251,7 +254,7 @@ func (svr *TLSServer) server_loop() {
 		for {
 			conn, err := svr.Listener.Accept()
 			if err != nil {
-				svr.Logger.Error("Server", "Cannot Accept connection from %s: %s", conn.RemoteAddr(), err.Error())
+				svr.Logger.Error("Server", "Cannot Accept connection (%s)", err.Error())
 				break
 			}
 			svr.Logger.Debug("Server", "Incoming Connection From %s", conn.RemoteAddr())
