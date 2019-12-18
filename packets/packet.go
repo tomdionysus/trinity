@@ -1,7 +1,7 @@
 package packets
 
 import (
-	"github.com/tomdionysus/consistenthash"
+	ch "github.com/tomdionysus/consistenthash"
 	"time"
 )
 
@@ -12,7 +12,7 @@ const (
 
 type Packet struct {
 	Command   uint16
-	ID        [16]byte
+	ID        ch.NodeId
 	RequestID [16]byte
 	Sent      time.Time
 
@@ -22,7 +22,7 @@ type Packet struct {
 func NewPacket(command uint16, payload interface{}) *Packet {
 	inst := &Packet{
 		Command: command,
-		ID:      consistenthash.NewRandomKey(),
+		ID:      ch.NewRandomNodeId(),
 		Sent:    time.Now(),
 		Payload: payload,
 	}
@@ -32,7 +32,7 @@ func NewPacket(command uint16, payload interface{}) *Packet {
 func NewResponsePacket(command uint16, requestid [16]byte, payload interface{}) *Packet {
 	inst := &Packet{
 		Command:   command,
-		ID:        [16]byte(consistenthash.NewRandomKey()),
+		ID:        [16]byte(ch.NewRandomKey()),
 		RequestID: requestid,
 		Sent:      time.Now(),
 		Payload:   payload,

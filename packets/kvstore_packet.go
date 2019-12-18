@@ -3,6 +3,7 @@ package packets
 import (
 	"encoding/gob"
 	"time"
+	ch "github.com/tomdionysus/consistenthash"
 )
 
 const (
@@ -24,7 +25,7 @@ type KVStorePacket struct {
 	ExpiresAt *time.Time
 	Flags     int16
 
-	TargetID [16]byte
+	TargetID  ch.NodeId
 }
 
 func init() {

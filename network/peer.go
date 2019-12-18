@@ -65,7 +65,7 @@ type Peer struct {
 	ServerNetworkNode *consistenthash.ServerNetworkNode
 
 	// Replies contains the current outstanding requests to the peer
-	Replies map[[16]byte]chan (*packets.Packet)
+	Replies map[consistenthash.NodeId]chan (*packets.Packet)
 }
 
 // NewPeer returns a new Peer with the specified logger, server and address
@@ -77,7 +77,7 @@ func NewPeer(logger *util.Logger, server *TLSServer, address string) *Peer {
 		Server:            server,
 		LastHeartbeat:     time.Now(),
 		ServerNetworkNode: nil,
-		Replies:           map[[16]byte]chan (*packets.Packet){},
+		Replies:           map[consistenthash.NodeId]chan (*packets.Packet){},
 	}
 	return inst
 }

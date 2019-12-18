@@ -23,7 +23,7 @@ func (peer *Peer) process_CMD_DISTRIBUTION(packet packets.Packet) {
 
 	// Because of misconfiguration, complex network topologies, or another faulty peer, it's possible that
 	// this connection is actually from ourselves. If so, shut it down.
-	if peer.Server.ServerNode.ID == peer.ServerNetworkNode.ID {
+	if peer.Server.ServerNode.ID.EqualTo(peer.ServerNetworkNode.ID) {
 		if !peer.Incoming {
 			peer.Logger.Warn("Peer", "%02X: The outgoing connection connected back to this node - disconnecting (%s)", peer.ServerNetworkNode.ID, peer.Connection.RemoteAddr())
 		} else {

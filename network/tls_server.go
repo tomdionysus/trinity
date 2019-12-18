@@ -41,7 +41,7 @@ type TLSServer struct {
 
 	SessionCache tls.ClientSessionCache
 
-	connections      map[[16]byte]*Peer
+	connections      map[ch.NodeId]*Peer
 	connectionsMutex sync.Mutex
 
 	Listener net.Listener
@@ -58,7 +58,7 @@ func NewTLSServer(logger *util.Logger, caPool *CAPool, kvStore *kvstore.KVStore,
 		KVStore:        kvStore,
 		CAPool:         caPool,
 
-		connections: map[[16]byte]*Peer{},
+		connections: map[ch.NodeId]*Peer{},
 	}
 	return inst
 }
@@ -126,14 +126,14 @@ func (svr *TLSServer) Stop() {
 // Connections Concurrent Map
 
 // ConnectionSet assigns the given Instance ID to the given peer
-func (svr *TLSServer) ConnectionSet(id ch.Key, peer *Peer) {
+func (svr *TLSServer) ConnectionSet(id ch.NodeId, peer *Peer) {
 	svr.connectionsMutex.Lock()
 	svr.connections[id] = peer
 	svr.connectionsMutex.Unlock()
 }
 
 // ConnectionGet returns the peer for the given ID, and whether that ID was found.
-func (svr *TLSServer) ConnectionGet(id ch.Key) (*Peer, bool) {
+func (svr *TLSServer) ConnectionGet(id ch.NodeId) (*Peer, bool) {
 	svr.connectionsMutex.Lock()
 	peer, found := svr.connections[id]
 	svr.connectionsMutex.Unlock()
@@ -141,16 +141,16 @@ func (svr *TLSServer) ConnectionGet(id ch.Key) (*Peer, bool) {
 }
 
 // ConnectionClear clears the peer for the given Instance ID.
-func (svr *TLSServer) ConnectionClear(id ch.Key) {
+func (svr *TLSServer) ConnectionClear(id ch.NodeId) {
 	svr.connectionsMutex.Lock()
 	delete(svr.connections, id)
 	svr.connectionsMutex.Unlock()
 }
 
 // Connections returns a current copy of all connections.
-func (svr *TLSServer) Connections() map[[16]byte]*Peer {
+func (svr *TLSServer) Connections() map[ch.NodeId]*Peer {
 	svr.connectionsMutex.Lock()
-	cpy := map[[16]byte]*Peer{}
+	cpy := map[ch.NodeId]*Peer{}
 
 	for k, v := range svr.connections {
 		cpy[k] = v

@@ -32,13 +32,17 @@ func NewKVStore(logger *util.Logger) *KVStore {
 }
 
 func (kvs *KVStore) Init() {
-	kvs.Logger.Debug("Memcache", "Init")
+	kvs.Logger.Debug("KVStore", "Init")
 }
 
 func (kvs *KVStore) Start() {
+	if(kvs.running) {
+		return
+	}
+
 	kvs.running = true
 	go func() {
-		kvs.Logger.Debug("Memcache", "Started")
+		kvs.Logger.Debug("KVStore", "Started")
 		for kvs.running {
 			expiretime := time.Now().UTC().Unix()
 			toexpire, found := kvs.expiry[expiretime]
@@ -49,7 +53,7 @@ func (kvs *KVStore) Start() {
 				}
 				delete(kvs.expiry, expiretime)
 			}
-			time.Sleep(900 * time.Millisecond)
+			time.Sleep(500 * time.Millisecond)
 		}
 	}()
 }
