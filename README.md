@@ -50,11 +50,12 @@ trinity-server --ca=<CA_PEM> --cert=<CERT_PEM> [other flags]
 
 ## Documentation
 
-| Document                             | Description                                            |
-|:-------------------------------------|:-------------------------------------------------------|
-| [Design Goals](docs/design-goals.md) | Design Goals of the project, roadmaps, reference       |
-| [Progress](docs/progress.md)         | Project Progress                                       |
-| [Encryption](docs/encryption.md)     | Encryption and security guide                          |
+| Document                                        | Description                                      |
+|:------------------------------------------------|:-------------------------------------------------|
+| [Design Goals](docs/design-goals.md)            | Design Goals of the project, roadmaps, reference |
+| [Progress](docs/progress.md)                    | Project Progress                                 |
+| [Encryption](docs/encryption.md)                | Encryption and security guide                    |
+| [Consistency Modes](docs/consistency_modes.md)  | Consistency Modes in Trinity                     |
 
 ## Component Package Repositories
 
