@@ -3,11 +3,12 @@ package network
 import (
 	"bufio"
 	"fmt"
-	"github.com/tomdionysus/trinity/util"
 	"net"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/tomdionysus/trinity/util"
 )
 
 type MemcacheServer struct {
@@ -86,6 +87,10 @@ func (mcs *MemcacheServer) handleConnection(addr string, conn net.Conn) {
 		if err != nil {
 			if strings.HasSuffix(err.Error(), "use of closed network connection") {
 				mcs.Logger.Debug("Memcache", "[%s] -> Disconnected", addr)
+				break
+			}
+			if strings.HasSuffix(err.Error(), "EOF") {
+				mcs.Logger.Debug("Memcache", "[%s] -> Disconnected(malformed request)", addr)
 				break
 			}
 			mcs.Logger.Error("Memcache", "[%s] -> Error: %s", addr, err.Error())
