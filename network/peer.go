@@ -3,9 +3,11 @@ package network
 import (
 	"crypto/tls"
 	"errors"
+
 	"github.com/tomdionysus/consistenthash"
 	"github.com/tomdionysus/trinity/packets"
 	"github.com/tomdionysus/trinity/util"
+
 	// "bytes"
 	"encoding/gob"
 	"strings"
@@ -116,7 +118,7 @@ func (peer *Peer) Connect() error {
 
 // Disconnect disconnects the remote trinity instance and removes the peer from the TLSServer connections
 func (peer *Peer) Disconnect() {
-	if peer.State != PeerStateDisconnected {
+	if peer.ServerNetworkNode != nil && peer.State != PeerStateDisconnected {
 		peer.State = PeerStateDisconnected
 		peer.Server.ServerNode.DeregisterNode(peer.ServerNetworkNode)
 		if peer.HeartbeatTicker != nil {
