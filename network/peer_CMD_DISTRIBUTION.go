@@ -39,7 +39,7 @@ func (peer *Peer) process_CMD_DISTRIBUTION(packet packets.Packet) {
 		peer.Logger.Debug("Peer", "%02X: Node Already Registered", peer.ServerNetworkNode.ID)
 	} else {
 		// Peer is new
-		_, err := peer.Server.ServerNode.RegisterNode(peer.ServerNetworkNode)
+		err := peer.Server.ServerNode.RegisterNode(peer.ServerNetworkNode)
 		if err != nil {
 			peer.Logger.Error("Peer", "%02X: Register Node Distribution Failed: %s", peer.ServerNetworkNode.ID, err.Error())
 			return

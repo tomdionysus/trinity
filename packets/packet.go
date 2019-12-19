@@ -10,10 +10,16 @@ const (
 	CMD_DISTRIBUTION = 2
 )
 
+type PacketId ch.Key
+
+func NewRandomPacketId() PacketId {
+	return PacketId(ch.NewRandomKey())
+}
+
 type Packet struct {
 	Command   uint16
-	ID        ch.NodeId
-	RequestID [16]byte
+	ID        PacketId
+	RequestID PacketId
 	Sent      time.Time
 
 	Payload interface{}
@@ -22,17 +28,17 @@ type Packet struct {
 func NewPacket(command uint16, payload interface{}) *Packet {
 	inst := &Packet{
 		Command: command,
-		ID:      ch.NewRandomNodeId(),
+		ID:      NewRandomPacketId(),
 		Sent:    time.Now(),
 		Payload: payload,
 	}
 	return inst
 }
 
-func NewResponsePacket(command uint16, requestid [16]byte, payload interface{}) *Packet {
+func NewResponsePacket(command uint16, requestid PacketId, payload interface{}) *Packet {
 	inst := &Packet{
 		Command:   command,
-		ID:        [16]byte(ch.NewRandomKey()),
+		ID:        NewRandomPacketId(),
 		RequestID: requestid,
 		Sent:      time.Now(),
 		Payload:   payload,
