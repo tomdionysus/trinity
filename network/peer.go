@@ -101,7 +101,6 @@ func (peer *Peer) Connect() error {
 	})
 	if err != nil {
 		peer.Logger.Error("Peer", "Cannot connect to %s: %s", peer.Address, err.Error())
-		peer.Disconnect()
 		return err
 	}
 	peer.Connection = conn
