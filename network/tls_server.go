@@ -7,13 +7,14 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"net"
+	"sync"
+	"time"
+
 	ch "github.com/tomdionysus/consistenthash"
 	"github.com/tomdionysus/trinity/kvstore"
 	"github.com/tomdionysus/trinity/packets"
 	"github.com/tomdionysus/trinity/util"
-	"net"
-	"sync"
-	"time"
 )
 
 // Commands
@@ -258,6 +259,54 @@ func (svr *TLSServer) GetKey(key string) ([]byte, int16, bool) {
 		}
 	}
 	return []byte{}, 0, false
+}
+
+// IsSet return if a key is set
+func (svr *TLSServer) IsSet(key string) bool {
+	keymd5 := ch.NewMD5Key(key)
+	nodes := svr.ServerNode.GetNodesFor(keymd5, 3)
+	for _, node := range nodes {
+		if node.ID == svr.ServerNode.ID {
+			svr.Logger.Debug("Server", "GetKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
+			// Local set.
+			return svr.KVStore.IsSet(key)
+		} else {
+			svr.Logger.Debug("Server", "GetKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
+
+			peer, _ := svr.ConnectionGet(node.ID)
+			if peer.State != PeerStateConnected {
+				svr.Logger.Warn("Server", "GetKey: Peer for key %02X -> %02X (Remote) Unavailable", keymd5, node.ID)
+				continue
+			}
+
+			// Remote Set.
+			payload := packets.KVStorePacket{
+				Command:  packets.CMD_KVSTORE_IS_SET,
+				Key:      key,
+				KeyHash:  keymd5,
+				TargetID: node.ID,
+			}
+			packet := packets.NewPacket(packets.CMD_KVSTORE, payload)
+			reply, err := peer.SendPacketWaitReply(packet, 5*time.Second)
+
+			// Process reply or timeout
+			if err == nil {
+				switch reply.Command {
+				case packets.CMD_KVSTORE_ACK:
+					svr.Logger.Debug("Server", "GetKey: Reply from Remote %s", key)
+					return true
+				case packets.CMD_KVSTORE_NOT_FOUND:
+					svr.Logger.Debug("Server", "GetKey: Reply from Remote %s Not Found", key)
+					return false
+				default:
+					svr.Logger.Warn("Server", "GetKey: Unknown Reply Command %d", reply.Command)
+				}
+			} else {
+				svr.Logger.Warn("Server", "GetKey: Reply Timeout")
+			}
+		}
+	}
+	return false
 }
 
 // DeleteKey clears the given key in the cluster.

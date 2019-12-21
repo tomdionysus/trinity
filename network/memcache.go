@@ -121,6 +121,9 @@ func (mcs *MemcacheServer) handleCommand(addr string, reader *bufio.Reader, writ
 	case "set":
 		mcs.handleSet(addr, reader, writer, args)
 		return false
+	case "add":
+		mcs.handleAdd(addr, reader, writer, args)
+		return false
 	case "get":
 		mcs.handleGet(addr, reader, writer, args)
 		return false
@@ -190,6 +193,68 @@ func (mcs *MemcacheServer) handleSet(addr string, reader *bufio.Reader, writer *
 	if expirytime != 0 {
 		expiry := time.Now().UTC().Add(time.Duration(expirytime) * time.Second)
 		expparam = &expiry
+	}
+	mcs.Server.SetKey(args[1], buf[:], int16(flags), expparam)
+	writer.WriteString("STORED\r\n")
+	writer.Flush()
+}
+
+func (mcs *MemcacheServer) handleAdd(addr string, reader *bufio.Reader, writer *bufio.Writer, args []string) {
+	if len(args) > 6 || len(args) < 5 {
+		writer.WriteString("ERROR\r\n")
+		writer.Flush()
+		return
+	}
+
+	mcs.Logger.Debug("Memcache", "[%s] -> Set %s", addr, args)
+
+	expirytime, err := strconv.Atoi(args[3])
+	if err != nil {
+		writer.WriteString("SERVER_ERROR\r\n")
+		writer.Flush()
+		return
+	}
+
+	flags, err := strconv.Atoi(args[2])
+	flags = flags & 0xFFFF
+	if err != nil {
+		writer.WriteString("SERVER_ERROR\r\n")
+		writer.Flush()
+		return
+	}
+
+	bytes, err := strconv.Atoi(args[4])
+	if err != nil {
+		writer.WriteString("SERVER_ERROR\r\n")
+		writer.Flush()
+		return
+	}
+
+	var buf []byte = make([]byte, bytes, bytes)
+	n, err := reader.Read(buf)
+	if err != nil || n != len(buf) {
+		writer.WriteString("SERVER_ERROR\r\n")
+		writer.Flush()
+		return
+	}
+
+	_, err = reader.ReadString('\n')
+	if err != nil {
+		writer.WriteString("SERVER_ERROR\r\n")
+		writer.Flush()
+		return
+	}
+
+	var expparam *time.Time = nil
+	if expirytime != 0 {
+		expiry := time.Now().UTC().Add(time.Duration(expirytime) * time.Second)
+		expparam = &expiry
+	}
+
+	if mcs.Server.IsSet(args[1]) == true {
+		writer.WriteString("NOT_STORED\r\n")
+		writer.Flush()
+		return
 	}
 	mcs.Server.SetKey(args[1], buf[:], int16(flags), expparam)
 	writer.WriteString("STORED\r\n")

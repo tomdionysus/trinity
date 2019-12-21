@@ -316,6 +316,8 @@ func (peer *Peer) handleKVStorePacket(packet *packets.Packet) {
 		peer.handleKVStoreSet(&kvpacket, packet)
 	case packets.CMD_KVSTORE_GET:
 		peer.handleKVStoreGet(&kvpacket, packet)
+	case packets.CMD_KVSTORE_IS_SET:
+		peer.handleKVStoreIsSet(&kvpacket, packet)
 	case packets.CMD_KVSTORE_DELETE:
 		peer.handleKVStoreDelete(&kvpacket, packet)
 	default:
@@ -355,6 +357,30 @@ func (peer *Peer) handleKVStoreGet(packet *packets.KVStorePacket, request *packe
 		response = packets.NewResponsePacket(packets.CMD_KVSTORE_NOT_FOUND, request.ID, packet.Key)
 		peer.Logger.Debug("Peer", "%02X: KVStoreGet: %s Not found, replying", peer.ServerNetworkNode.ID, packet.Key)
 	}
+
+	peer.SendPacket(response)
+}
+
+func (peer *Peer) handleKVStoreIsSet(packet *packets.KVStorePacket, request *packets.Packet) {
+	peer.Logger.Debug("Peer", "%02X: KVStoreGet: %s", peer.ServerNetworkNode.ID, packet.Key)
+	found := peer.Server.KVStore.IsSet(packet.Key)
+
+	data := make([]byte, 1)
+	status := uint16(packets.CMD_KVSTORE_NOT_FOUND)
+	if found {
+		data[0] = 1
+		status = packets.CMD_KVSTORE_ACK
+	}
+
+	var response *packets.Packet
+
+	payload := packets.KVStorePacket{
+		Command: packets.CMD_KVSTORE_IS_SET,
+		Key:     packet.Key,
+		Data:    data,
+	}
+	response = packets.NewResponsePacket(status, request.ID, payload)
+	peer.Logger.Debug("Peer", "%02X: KVStoreIsSet: %s replying", peer.ServerNetworkNode.ID, packet.Key)
 
 	peer.SendPacket(response)
 }
