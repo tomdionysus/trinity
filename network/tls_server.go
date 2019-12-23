@@ -169,9 +169,9 @@ func (svr *TLSServer) NotifyAllPeers() {
 
 	for id, peer := range currentConns {
 		payload := packets.PeerListPacket{}
-		for listId, listPeer := range currentConns {
-			if listId != id {
-				payload[listId] = listPeer.ServerNetworkNode.HostAddr
+		for listID, listPeer := range currentConns {
+			if listID != id {
+				payload[listID] = listPeer.ServerNetworkNode.HostAddr
 			}
 		}
 		peer.SendPacket(packets.NewPacket(packets.CMD_PEERLIST, payload))

@@ -24,6 +24,7 @@ const (
 	PeerStateDefib        = iota
 )
 
+// PeerStateString exports helper for peer state
 var PeerStateString map[uint]string = map[uint]string{
 	PeerStateDisconnected: "PeerStateDisconnected",
 	PeerStateConnecting:   "PeerStateConnecting",
@@ -280,6 +281,7 @@ func (peer *Peer) SendDistribution() error {
 	return nil
 }
 
+// SendPacket send a packet without waiting for response from peer
 func (peer *Peer) SendPacket(packet *packets.Packet) error {
 	err := peer.Writer.Encode(packet)
 	if err != nil {
@@ -288,6 +290,7 @@ func (peer *Peer) SendPacket(packet *packets.Packet) error {
 	return err
 }
 
+// SendPacketWaitReply Send a packet to a peer and wait for reply
 func (peer *Peer) SendPacketWaitReply(packet *packets.Packet, timeout time.Duration) (*packets.Packet, error) {
 	if peer.State != PeerStateConnected {
 		peer.Logger.Error("Peer", "%02X: Cannot send packet ID %02X, not PeerStateConnected", peer.ServerNetworkNode.ID, packet.ID)

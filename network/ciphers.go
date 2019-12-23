@@ -1,5 +1,6 @@
 package network
 
+// Ciphers exports the list of supported cypher suit
 var Ciphers map[uint16]string = map[uint16]string{
 	0x0005: "TLS_RSA_WITH_RC4_128_SHA",
 	0x000a: "TLS_RSA_WITH_3DES_EDE_CBC_SHA",
