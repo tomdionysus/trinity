@@ -4,13 +4,13 @@ import (
 	"bufio"
 	"fmt"
 	"net"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/tomdionysus/trinity/util"
 )
 
+// MemcacheServer is the structure holding the memcached server configuration and interface
 type MemcacheServer struct {
 	Logger   *util.Logger
 	Port     int
@@ -20,6 +20,7 @@ type MemcacheServer struct {
 	Connections map[string]net.Conn
 }
 
+// NewMemcacheServer create and return a MemcacheServer instance
 func NewMemcacheServer(logger *util.Logger, port int, server *TLSServer) *MemcacheServer {
 	inst := &MemcacheServer{
 		Logger:      logger,
@@ -30,11 +31,13 @@ func NewMemcacheServer(logger *util.Logger, port int, server *TLSServer) *Memcac
 	return inst
 }
 
+// Init initialise internal state of the MemcacheServer
 func (mcs *MemcacheServer) Init() error {
 	mcs.Logger.Debug("Memcache", "Init")
 	return nil
 }
 
+// Start network interface
 func (mcs *MemcacheServer) Start() error {
 	listener, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", mcs.Port))
 	if err != nil {
@@ -60,6 +63,7 @@ func (mcs *MemcacheServer) Start() error {
 	return nil
 }
 
+// Stop network interface
 func (mcs *MemcacheServer) Stop() {
 	// Listener
 	if mcs.Listener != nil {
@@ -155,22 +159,7 @@ func (mcs *MemcacheServer) handleSet(addr string, reader *bufio.Reader, writer *
 
 	mcs.Logger.Debug("Memcache", "[%s] -> Set %s", addr, args)
 
-	expirytime, err := strconv.Atoi(args[3])
-	if err != nil {
-		writer.WriteString("SERVER_ERROR\r\n")
-		writer.Flush()
-		return
-	}
-
-	flags, err := strconv.Atoi(args[2])
-	flags = flags & 0xFFFF
-	if err != nil {
-		writer.WriteString("SERVER_ERROR\r\n")
-		writer.Flush()
-		return
-	}
-
-	bytes, err := strconv.Atoi(args[4])
+	expirytime, flags, bytes, err := util.MemcachedSetArgsHelper(args)
 	if err != nil {
 		writer.WriteString("SERVER_ERROR\r\n")
 		writer.Flush()
@@ -209,25 +198,11 @@ func (mcs *MemcacheServer) handleAdd(addr string, reader *bufio.Reader, writer *
 		return
 	}
 
-	mcs.Logger.Debug("Memcache", "[%s] -> Set %s", addr, args)
+	mcs.Logger.Debug("Memcache", "[%s] -> Add %s", addr, args)
 
-	expirytime, err := strconv.Atoi(args[3])
+	expirytime, flags, bytes, err := util.MemcachedSetArgsHelper(args)
 	if err != nil {
-		writer.WriteString("SERVER_ERROR\r\n")
-		writer.Flush()
-		return
-	}
-
-	flags, err := strconv.Atoi(args[2])
-	flags = flags & 0xFFFF
-	if err != nil {
-		writer.WriteString("SERVER_ERROR\r\n")
-		writer.Flush()
-		return
-	}
-
-	bytes, err := strconv.Atoi(args[4])
-	if err != nil {
+		mcs.Logger.Debug("memcached", "%s", err)
 		writer.WriteString("SERVER_ERROR\r\n")
 		writer.Flush()
 		return
@@ -236,6 +211,7 @@ func (mcs *MemcacheServer) handleAdd(addr string, reader *bufio.Reader, writer *
 	var buf []byte = make([]byte, bytes, bytes)
 	n, err := reader.Read(buf)
 	if err != nil || n != len(buf) {
+		mcs.Logger.Debug("memcached", "%s", err)
 		writer.WriteString("SERVER_ERROR\r\n")
 		writer.Flush()
 		return
@@ -271,24 +247,9 @@ func (mcs *MemcacheServer) handleReplace(addr string, reader *bufio.Reader, writ
 		return
 	}
 
-	mcs.Logger.Debug("Memcache", "[%s] -> Set %s", addr, args)
+	mcs.Logger.Debug("Memcache", "[%s] -> Replace %s", addr, args)
 
-	expirytime, err := strconv.Atoi(args[3])
-	if err != nil {
-		writer.WriteString("SERVER_ERROR\r\n")
-		writer.Flush()
-		return
-	}
-
-	flags, err := strconv.Atoi(args[2])
-	flags = flags & 0xFFFF
-	if err != nil {
-		writer.WriteString("SERVER_ERROR\r\n")
-		writer.Flush()
-		return
-	}
-
-	bytes, err := strconv.Atoi(args[4])
+	expirytime, flags, bytes, err := util.MemcachedSetArgsHelper(args)
 	if err != nil {
 		writer.WriteString("SERVER_ERROR\r\n")
 		writer.Flush()
