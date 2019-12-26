@@ -1,9 +1,10 @@
 package network
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/tomdionysus/trinity/util"
-	"testing"
 )
 
 func TestNewCAPool(t *testing.T) {

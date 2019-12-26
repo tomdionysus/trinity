@@ -1,9 +1,10 @@
 package network
 
 import (
+	"time"
+
 	"github.com/tomdionysus/consistenthash"
 	"github.com/tomdionysus/trinity/packets"
-	"time"
 )
 
 // process_CMD_DISTRIBUTION processes a CMD_DISTRIBUTION packet received from a peer.

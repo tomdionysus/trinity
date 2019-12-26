@@ -3,9 +3,11 @@ package network
 import (
 	"crypto/tls"
 	"errors"
+
 	"github.com/tomdionysus/consistenthash"
 	"github.com/tomdionysus/trinity/packets"
 	"github.com/tomdionysus/trinity/util"
+
 	// "bytes"
 	"encoding/gob"
 	"strings"
@@ -19,15 +21,18 @@ const (
 	PeerStateHandshake    = iota
 	PeerStateConnected    = iota
 	PeerStateSyncing      = iota
+	PeerStateReady        = iota
 	PeerStateDefib        = iota
 )
 
+// PeerStateString exports helper for peer state
 var PeerStateString map[uint]string = map[uint]string{
 	PeerStateDisconnected: "PeerStateDisconnected",
 	PeerStateConnecting:   "PeerStateConnecting",
 	PeerStateHandshake:    "PeerStateHandshake",
 	PeerStateConnected:    "PeerStateConnected",
 	PeerStateSyncing:      "PeerStateSyncing",
+	PeerStateReady:        "PeerStateReady",
 	PeerStateDefib:        "PeerStateDefib",
 }
 
@@ -47,7 +52,7 @@ type Peer struct {
 	// State is the State of the peer
 	State uint
 
-	// Connecton is the underlying TLS secured connection
+	// Connection is the underlying TLS secured connection
 	Connection *tls.Conn
 
 	// HeartbeatTicker is the ticker used to generate heartbeat packets (every 1s)
@@ -116,7 +121,7 @@ func (peer *Peer) Connect() error {
 
 // Disconnect disconnects the remote trinity instance and removes the peer from the TLSServer connections
 func (peer *Peer) Disconnect() {
-	if peer.State != PeerStateDisconnected {
+	if peer.ServerNetworkNode != nil && peer.State != PeerStateDisconnected {
 		peer.State = PeerStateDisconnected
 		peer.Server.ServerNode.DeregisterNode(peer.ServerNetworkNode)
 		if peer.HeartbeatTicker != nil {
@@ -272,12 +277,14 @@ func (peer *Peer) handleReply(packet *packets.Packet) {
 	}
 }
 
+// SendDistribution send node information about to the peer
 func (peer *Peer) SendDistribution() error {
 	packet := packets.NewPacket(packets.CMD_DISTRIBUTION, peer.Server.ServerNode.ServerNetworkNode)
 	peer.SendPacket(packet)
 	return nil
 }
 
+// SendPacket send a packet without waiting for response from peer
 func (peer *Peer) SendPacket(packet *packets.Packet) error {
 	err := peer.Writer.Encode(packet)
 	if err != nil {
@@ -286,6 +293,7 @@ func (peer *Peer) SendPacket(packet *packets.Packet) error {
 	return err
 }
 
+// SendPacketWaitReply Send a packet to a peer and wait for reply
 func (peer *Peer) SendPacketWaitReply(packet *packets.Packet, timeout time.Duration) (*packets.Packet, error) {
 	if peer.State != PeerStateConnected {
 		peer.Logger.Error("Peer", "%02X: Cannot send packet ID %02X, not PeerStateConnected", peer.ServerNetworkNode.ID, packet.ID)
@@ -314,6 +322,8 @@ func (peer *Peer) handleKVStorePacket(packet *packets.Packet) {
 		peer.handleKVStoreSet(&kvpacket, packet)
 	case packets.CMD_KVSTORE_GET:
 		peer.handleKVStoreGet(&kvpacket, packet)
+	case packets.CMD_KVSTORE_IS_SET:
+		peer.handleKVStoreIsSet(&kvpacket, packet)
 	case packets.CMD_KVSTORE_DELETE:
 		peer.handleKVStoreDelete(&kvpacket, packet)
 	default:
@@ -353,6 +363,30 @@ func (peer *Peer) handleKVStoreGet(packet *packets.KVStorePacket, request *packe
 		response = packets.NewResponsePacket(packets.CMD_KVSTORE_NOT_FOUND, request.ID, packet.Key)
 		peer.Logger.Debug("Peer", "%02X: KVStoreGet: %s Not found, replying", peer.ServerNetworkNode.ID, packet.Key)
 	}
+
+	peer.SendPacket(response)
+}
+
+func (peer *Peer) handleKVStoreIsSet(packet *packets.KVStorePacket, request *packets.Packet) {
+	peer.Logger.Debug("Peer", "%02X: KVStoreGet: %s", peer.ServerNetworkNode.ID, packet.Key)
+	found := peer.Server.KVStore.IsSet(packet.Key)
+
+	data := make([]byte, 1)
+	status := uint16(packets.CMD_KVSTORE_NOT_FOUND)
+	if found {
+		data[0] = 1
+		status = packets.CMD_KVSTORE_ACK
+	}
+
+	var response *packets.Packet
+
+	payload := packets.KVStorePacket{
+		Command: packets.CMD_KVSTORE_IS_SET,
+		Key:     packet.Key,
+		Data:    data,
+	}
+	response = packets.NewResponsePacket(status, request.ID, payload)
+	peer.Logger.Debug("Peer", "%02X: KVStoreIsSet: %s replying", peer.ServerNetworkNode.ID, packet.Key)
 
 	peer.SendPacket(response)
 }
