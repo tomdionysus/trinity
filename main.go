@@ -83,6 +83,7 @@ func main() {
 	}
 
 	for _, remoteAddr := range config.Nodes {
+		logger.Info("Main","Attempting Connection to Peer (%s)",remoteAddr)
 		svr.ConnectTo(remoteAddr)
 	}
 

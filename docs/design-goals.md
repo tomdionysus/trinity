@@ -7,7 +7,7 @@
 * Built-in fast, distributed Key-Value Store
 * Automatic replication and sharding
 * Distributed Queries 
-* Multi-mode consistency - per write, choose fire-and-forget, eventual, full
+* Multi-mode consistency - per write choose: fire-and-forget, eventual, full
 * Soft clusters - add/remove nodes at any time
 * Capacity scales by adding nodes
 * Optional Direct block level access, no filesystem

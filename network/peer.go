@@ -119,15 +119,19 @@ func (peer *Peer) Connect() error {
 func (peer *Peer) Disconnect() {
 	if peer.State != PeerStateDisconnected {
 		peer.State = PeerStateDisconnected
-		peer.Server.ServerNode.DeregisterNode(peer.ServerNetworkNode)
 		if peer.HeartbeatTicker != nil {
 			peer.HeartbeatTicker.Stop()
+		}
+		if peer.ServerNetworkNode !=nil {
+			peer.Server.ServerNode.DeregisterNode(peer.ServerNetworkNode)
+			peer.Server.ConnectionClear(peer.ServerNetworkNode.ID)
+			peer.Logger.Info("Peer", "%02X: Disconnected", peer.ServerNetworkNode.ID)
+		} else {
+			peer.Logger.Info("Peer", "Unregistered Peer Disconnected (%s)", peer.Address)
 		}
 		if peer.Connection != nil {
 			peer.Connection.Close()
 		}
-		peer.Logger.Info("Peer", "%02X: Disconnected", peer.ServerNetworkNode.ID)
-		peer.Server.ConnectionClear(peer.ServerNetworkNode.ID)
 	}
 }
 
