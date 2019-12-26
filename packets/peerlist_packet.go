@@ -2,6 +2,7 @@ package packets
 
 import (
 	"encoding/gob"
+
 	"github.com/tomdionysus/consistenthash"
 )
 

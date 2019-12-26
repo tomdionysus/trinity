@@ -1,9 +1,10 @@
 package packets
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/tomdionysus/consistenthash"
-	"testing"
 )
 
 func TestNewPacket(t *testing.T) {

@@ -33,4 +33,4 @@ Work continues on [bplustree](https://github.com/tomdionysus/bplustree) which wi
 
 ## BUGS
 
-* In rare cicrumstances a node will be notified of its own address, and connect to itself.
+* In rare circumstances a node will be notified of its own address, and connect to itself.
