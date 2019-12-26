@@ -1,11 +1,11 @@
 package config
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 )
 
+// Config struct hold config information for the node
 type Config struct {
 	Nodes           NodeURLs
 	CA              *string
@@ -17,6 +17,7 @@ type Config struct {
 	HostAddr        *string
 }
 
+// NewConfig init a new Config struct with default value
 func NewConfig() *Config {
 	inst := &Config{}
 
@@ -38,10 +39,11 @@ func NewConfig() *Config {
 	return inst
 }
 
+// Validate configuration
 func (cfg *Config) Validate() (bool, []error) {
 	errs := []error{}
 	if *cfg.Port < 0 || *cfg.Port > 65535 {
-		errs = append(errs, errors.New(fmt.Sprintf("Port %d is invalid (0-65535)", *cfg.Port)))
+		errs = append(errs, fmt.Errorf("Port %d is invalid (0-65535)", *cfg.Port))
 	}
 	return len(errs) == 0, errs
 }
