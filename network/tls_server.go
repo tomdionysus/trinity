@@ -267,15 +267,15 @@ func (svr *TLSServer) IsSet(key string) bool {
 	nodes := svr.ServerNode.GetNodesFor(keymd5, 3)
 	for _, node := range nodes {
 		if node.ID == svr.ServerNode.ID {
-			svr.Logger.Debug("Server", "GetKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
+			svr.Logger.Debug("Server", "IsSet: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
 			// Local set.
 			return svr.KVStore.IsSet(key)
 		} else {
-			svr.Logger.Debug("Server", "GetKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
+			svr.Logger.Debug("Server", "IsSet: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
 
 			peer, _ := svr.ConnectionGet(node.ID)
 			if peer.State != PeerStateConnected {
-				svr.Logger.Warn("Server", "GetKey: Peer for key %02X -> %02X (Remote) Unavailable", keymd5, node.ID)
+				svr.Logger.Warn("Server", "IsSet: Peer for key %02X -> %02X (Remote) Unavailable", keymd5, node.ID)
 				continue
 			}
 
@@ -293,16 +293,16 @@ func (svr *TLSServer) IsSet(key string) bool {
 			if err == nil {
 				switch reply.Command {
 				case packets.CMD_KVSTORE_ACK:
-					svr.Logger.Debug("Server", "GetKey: Reply from Remote %s", key)
+					svr.Logger.Debug("Server", "IsSet: Reply from Remote %s", key)
 					return true
 				case packets.CMD_KVSTORE_NOT_FOUND:
-					svr.Logger.Debug("Server", "GetKey: Reply from Remote %s Not Found", key)
+					svr.Logger.Debug("Server", "IsSet: Reply from Remote %s Not Found", key)
 					return false
 				default:
-					svr.Logger.Warn("Server", "GetKey: Unknown Reply Command %d", reply.Command)
+					svr.Logger.Warn("Server", "IsSet: Unknown Reply Command %d", reply.Command)
 				}
 			} else {
-				svr.Logger.Warn("Server", "GetKey: Reply Timeout")
+				svr.Logger.Warn("Server", "IsSet: Reply Timeout")
 			}
 		}
 	}
