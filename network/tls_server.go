@@ -7,13 +7,14 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"net"
+	"sync"
+	"time"
+
 	ch "github.com/tomdionysus/consistenthash"
 	"github.com/tomdionysus/trinity/kvstore"
 	"github.com/tomdionysus/trinity/packets"
 	"github.com/tomdionysus/trinity/util"
-	"net"
-	"sync"
-	"time"
 )
 
 // Commands
@@ -41,7 +42,7 @@ type TLSServer struct {
 
 	SessionCache tls.ClientSessionCache
 
-	connections      map[[16]byte]*Peer
+	connections      map[ch.NodeId]*Peer
 	connectionsMutex sync.Mutex
 
 	Listener net.Listener
@@ -58,7 +59,7 @@ func NewTLSServer(logger *util.Logger, caPool *CAPool, kvStore *kvstore.KVStore,
 		KVStore:        kvStore,
 		CAPool:         caPool,
 
-		connections: map[[16]byte]*Peer{},
+		connections: map[ch.NodeId]*Peer{},
 	}
 	return inst
 }
@@ -126,14 +127,14 @@ func (svr *TLSServer) Stop() {
 // Connections Concurrent Map
 
 // ConnectionSet assigns the given Instance ID to the given peer
-func (svr *TLSServer) ConnectionSet(id ch.Key, peer *Peer) {
+func (svr *TLSServer) ConnectionSet(id ch.NodeId, peer *Peer) {
 	svr.connectionsMutex.Lock()
 	svr.connections[id] = peer
 	svr.connectionsMutex.Unlock()
 }
 
 // ConnectionGet returns the peer for the given ID, and whether that ID was found.
-func (svr *TLSServer) ConnectionGet(id ch.Key) (*Peer, bool) {
+func (svr *TLSServer) ConnectionGet(id ch.NodeId) (*Peer, bool) {
 	svr.connectionsMutex.Lock()
 	peer, found := svr.connections[id]
 	svr.connectionsMutex.Unlock()
@@ -141,16 +142,16 @@ func (svr *TLSServer) ConnectionGet(id ch.Key) (*Peer, bool) {
 }
 
 // ConnectionClear clears the peer for the given Instance ID.
-func (svr *TLSServer) ConnectionClear(id ch.Key) {
+func (svr *TLSServer) ConnectionClear(id ch.NodeId) {
 	svr.connectionsMutex.Lock()
 	delete(svr.connections, id)
 	svr.connectionsMutex.Unlock()
 }
 
 // Connections returns a current copy of all connections.
-func (svr *TLSServer) Connections() map[[16]byte]*Peer {
+func (svr *TLSServer) Connections() map[ch.NodeId]*Peer {
 	svr.connectionsMutex.Lock()
-	cpy := map[[16]byte]*Peer{}
+	cpy := map[ch.NodeId]*Peer{}
 
 	for k, v := range svr.connections {
 		cpy[k] = v
@@ -168,9 +169,9 @@ func (svr *TLSServer) NotifyAllPeers() {
 
 	for id, peer := range currentConns {
 		payload := packets.PeerListPacket{}
-		for listId, listPeer := range currentConns {
-			if listId != id {
-				payload[listId] = listPeer.ServerNetworkNode.HostAddr
+		for listID, listPeer := range currentConns {
+			if listID != id {
+				payload[listID] = listPeer.ServerNetworkNode.HostAddr
 			}
 		}
 		peer.SendPacket(packets.NewPacket(packets.CMD_PEERLIST, payload))
@@ -258,6 +259,54 @@ func (svr *TLSServer) GetKey(key string) ([]byte, int16, bool) {
 		}
 	}
 	return []byte{}, 0, false
+}
+
+// IsSet return if a key is set
+func (svr *TLSServer) IsSet(key string) bool {
+	keymd5 := ch.NewMD5Key(key)
+	nodes := svr.ServerNode.GetNodesFor(keymd5, 3)
+	for _, node := range nodes {
+		if node.ID == svr.ServerNode.ID {
+			svr.Logger.Debug("Server", "GetKey: Peer for key %02X -> %02X (Local)", keymd5, node.ID)
+			// Local set.
+			return svr.KVStore.IsSet(key)
+		} else {
+			svr.Logger.Debug("Server", "GetKey: Peer for key %02X -> %02X (Remote)", keymd5, node.ID)
+
+			peer, _ := svr.ConnectionGet(node.ID)
+			if peer.State != PeerStateConnected {
+				svr.Logger.Warn("Server", "GetKey: Peer for key %02X -> %02X (Remote) Unavailable", keymd5, node.ID)
+				continue
+			}
+
+			// Remote Set.
+			payload := packets.KVStorePacket{
+				Command:  packets.CMD_KVSTORE_IS_SET,
+				Key:      key,
+				KeyHash:  keymd5,
+				TargetID: node.ID,
+			}
+			packet := packets.NewPacket(packets.CMD_KVSTORE, payload)
+			reply, err := peer.SendPacketWaitReply(packet, 5*time.Second)
+
+			// Process reply or timeout
+			if err == nil {
+				switch reply.Command {
+				case packets.CMD_KVSTORE_ACK:
+					svr.Logger.Debug("Server", "GetKey: Reply from Remote %s", key)
+					return true
+				case packets.CMD_KVSTORE_NOT_FOUND:
+					svr.Logger.Debug("Server", "GetKey: Reply from Remote %s Not Found", key)
+					return false
+				default:
+					svr.Logger.Warn("Server", "GetKey: Unknown Reply Command %d", reply.Command)
+				}
+			} else {
+				svr.Logger.Warn("Server", "GetKey: Reply Timeout")
+			}
+		}
+	}
+	return false
 }
 
 // DeleteKey clears the given key in the cluster.

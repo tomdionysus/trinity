@@ -1,9 +1,10 @@
 package network
 
 import (
+	"time"
+
 	"github.com/tomdionysus/consistenthash"
 	"github.com/tomdionysus/trinity/packets"
-	"time"
 )
 
 // process_CMD_DISTRIBUTION processes a CMD_DISTRIBUTION packet received from a peer.
@@ -23,7 +24,7 @@ func (peer *Peer) process_CMD_DISTRIBUTION(packet packets.Packet) {
 
 	// Because of misconfiguration, complex network topologies, or another faulty peer, it's possible that
 	// this connection is actually from ourselves. If so, shut it down.
-	if peer.Server.ServerNode.ID == peer.ServerNetworkNode.ID {
+	if peer.Server.ServerNode.ID.EqualTo(peer.ServerNetworkNode.ID) {
 		if !peer.Incoming {
 			peer.Logger.Warn("Peer", "%02X: The outgoing connection connected back to this node - disconnecting (%s)", peer.ServerNetworkNode.ID, peer.Connection.RemoteAddr())
 		} else {
@@ -39,7 +40,7 @@ func (peer *Peer) process_CMD_DISTRIBUTION(packet packets.Packet) {
 		peer.Logger.Debug("Peer", "%02X: Node Already Registered", peer.ServerNetworkNode.ID)
 	} else {
 		// Peer is new
-		_, err := peer.Server.ServerNode.RegisterNode(peer.ServerNetworkNode)
+		err := peer.Server.ServerNode.RegisterNode(peer.ServerNetworkNode)
 		if err != nil {
 			peer.Logger.Error("Peer", "%02X: Register Node Distribution Failed: %s", peer.ServerNetworkNode.ID, err.Error())
 			return

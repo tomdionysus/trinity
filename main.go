@@ -7,6 +7,7 @@ import (
 	"github.com/tomdionysus/trinity/kvstore"
 	"github.com/tomdionysus/trinity/network"
 	"github.com/tomdionysus/trinity/util"
+
 	// "github.com/tomdionysus/trinity/packets"
 	"os"
 )

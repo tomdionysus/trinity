@@ -12,7 +12,7 @@ func (peer *Peer) process_CMD_PEERLIST(packet packets.Packet) {
 	peer.Logger.Debug("Peer", "%02X: CMD_PEERLIST (%d Peers)", peer.ServerNetworkNode.ID, len(peers))
 
 	for id, k := range peers {
-		if peer.Server.ServerNode.ID == id {
+		if peer.Server.ServerNode.ID.EqualTo(id) {
 			peer.Logger.Warn("Peer", "%02X: - Notified us of ourselves (%02X).", peer.ServerNetworkNode.ID, id)
 		} else {
 			if _, connected := peer.Server.ConnectionGet(id); !connected {
