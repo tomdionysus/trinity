@@ -1,10 +1,11 @@
 package kvstore
 
 import (
-	"github.com/stretchr/testify/assert"
-	"github.com/tomdionysus/trinity/util"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/tomdionysus/trinity/util"
 )
 
 func TestNewKVStore(t *testing.T) {

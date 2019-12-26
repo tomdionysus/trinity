@@ -21,6 +21,7 @@ const (
 	PeerStateHandshake    = iota
 	PeerStateConnected    = iota
 	PeerStateSyncing      = iota
+	PeerStateReady        = iota
 	PeerStateDefib        = iota
 )
 
@@ -31,6 +32,7 @@ var PeerStateString map[uint]string = map[uint]string{
 	PeerStateHandshake:    "PeerStateHandshake",
 	PeerStateConnected:    "PeerStateConnected",
 	PeerStateSyncing:      "PeerStateSyncing",
+	PeerStateReady:        "PeerStateReady",
 	PeerStateDefib:        "PeerStateDefib",
 }
 
@@ -50,7 +52,7 @@ type Peer struct {
 	// State is the State of the peer
 	State uint
 
-	// Connecton is the underlying TLS secured connection
+	// Connection is the underlying TLS secured connection
 	Connection *tls.Conn
 
 	// HeartbeatTicker is the ticker used to generate heartbeat packets (every 1s)
@@ -275,6 +277,7 @@ func (peer *Peer) handleReply(packet *packets.Packet) {
 	}
 }
 
+// SendDistribution send node information about to the peer
 func (peer *Peer) SendDistribution() error {
 	packet := packets.NewPacket(packets.CMD_DISTRIBUTION, peer.Server.ServerNode.ServerNetworkNode)
 	peer.SendPacket(packet)
