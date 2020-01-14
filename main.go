@@ -45,6 +45,9 @@ func main() {
 	logger.Debug("Config", "Port: %d", *config.Port)
 	logger.Debug("Config", "Advertise: %s", *config.HostAddr)
 	logger.Debug("Config", "LogLevel: %s (%d)", *config.LogLevel, logger.LogLevel)
+	if *config.DisableHeartbeat {
+		logger.Debug("Config", "Heartbeat disabled on this instance, be carefull with system reliability")
+	}
 
 	// CA
 	capool := network.NewCAPool(logger)
@@ -56,7 +59,7 @@ func main() {
 	logger.Debug("Main", "CA Certiticate Loaded")
 
 	// Server
-	svr := network.NewTLSServer(logger, capool, kv, *config.HostAddr)
+	svr := network.NewTLSServer(logger, capool, kv, *config.HostAddr, *config.DisableHeartbeat)
 	logger.Info("Main", "Trinity Node ID %02X", svr.ServerNode.ID)
 
 	// Certificate
@@ -84,7 +87,7 @@ func main() {
 	}
 
 	for _, remoteAddr := range config.Nodes {
-		logger.Info("Main","Attempting Connection to Peer (%s)",remoteAddr)
+		logger.Info("Main", "Attempting Connection to Peer (%s)", remoteAddr)
 		svr.ConnectTo(remoteAddr)
 	}
 

@@ -7,14 +7,15 @@ import (
 
 // Config struct hold config information for the node
 type Config struct {
-	Nodes           NodeURLs
-	CA              *string
-	Certificate     *string
-	Port            *int
-	LogLevel        *string
-	MemcacheEnabled *bool
-	MemcachePort    *int
-	HostAddr        *string
+	Nodes            NodeURLs
+	CA               *string
+	Certificate      *string
+	Port             *int
+	LogLevel         *string
+	MemcacheEnabled  *bool
+	MemcachePort     *int
+	HostAddr         *string
+	DisableHeartbeat *bool
 }
 
 // NewConfig init a new Config struct with default value
@@ -29,6 +30,7 @@ func NewConfig() *Config {
 	inst.MemcacheEnabled = flag.Bool("memcache", false, "Enable Memcache Server")
 	inst.MemcachePort = flag.Int("memcacheport", 11211, "Memcache port")
 	inst.HostAddr = flag.String("hostaddr", "", "Advertised hostname:port")
+	inst.DisableHeartbeat = flag.Bool("disable-heartbeat", false, "[DEV ONLY] Disable heartbeat check to avoid losing connection on breakpoint")
 	flag.Parse()
 
 	if *inst.HostAddr == "" {

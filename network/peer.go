@@ -126,7 +126,7 @@ func (peer *Peer) Disconnect() {
 		if peer.HeartbeatTicker != nil {
 			peer.HeartbeatTicker.Stop()
 		}
-		if peer.ServerNetworkNode !=nil {
+		if peer.ServerNetworkNode != nil {
 			peer.Server.ServerNode.DeregisterNode(peer.ServerNetworkNode)
 			peer.Server.ConnectionClear(peer.ServerNetworkNode.ID)
 			peer.Logger.Info("Peer", "%02X: Disconnected", peer.ServerNetworkNode.ID)
@@ -140,7 +140,7 @@ func (peer *Peer) Disconnect() {
 }
 
 // Start processes the TLS handshake and registration protocol once connected
-func (peer *Peer) Start() error {
+func (peer *Peer) Start(disableHeartbeat bool) error {
 	if peer.State != PeerStateHandshake {
 		peer.Logger.Error("Peer", "Cannot Start Peer, Handshake not ready")
 		return errors.New("Handshake not ready")
@@ -168,7 +168,9 @@ func (peer *Peer) Start() error {
 	peer.Reader = gob.NewDecoder(peer.Connection)
 	peer.Writer = gob.NewEncoder(peer.Connection)
 
-	go peer.heartbeat()
+	if !disableHeartbeat {
+		go peer.heartbeat()
+	}
 
 	peer.SendDistribution()
 

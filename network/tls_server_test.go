@@ -7,7 +7,7 @@ import (
 )
 
 func TestTLSServer(t *testing.T) {
-	inst := NewTLSServer(nil, nil, nil, "HOSTNAME")
+	inst := NewTLSServer(nil, nil, nil, "HOSTNAME", false)
 
 	assert.NotNil(t, inst)
 }
