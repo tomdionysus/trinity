@@ -44,12 +44,13 @@ type TLSServer struct {
 
 	connections      map[ch.NodeId]*Peer
 	connectionsMutex sync.Mutex
+	disableHeartbeat bool
 
 	Listener net.Listener
 }
 
 // NewTLSServer creates and returns a new TLSServer with the given logger, CA Pool, KV Store and host name
-func NewTLSServer(logger *util.Logger, caPool *CAPool, kvStore *kvstore.KVStore, hostname string) *TLSServer {
+func NewTLSServer(logger *util.Logger, caPool *CAPool, kvStore *kvstore.KVStore, hostname string, disableHeartbeat bool) *TLSServer {
 	inst := &TLSServer{
 		ServerNode:     ch.NewServerNode(hostname),
 		Logger:         logger,
@@ -59,7 +60,8 @@ func NewTLSServer(logger *util.Logger, caPool *CAPool, kvStore *kvstore.KVStore,
 		KVStore:        kvStore,
 		CAPool:         caPool,
 
-		connections: map[ch.NodeId]*Peer{},
+		connections:      map[ch.NodeId]*Peer{},
+		disableHeartbeat: disableHeartbeat,
 	}
 	return inst
 }
@@ -90,7 +92,7 @@ func (svr *TLSServer) ConnectTo(remoteAddr string) error {
 		svr.Logger.Error("Server", "Cannot Connect to Node %s: %s", remoteAddr, err.Error())
 		return err
 	}
-	peer.Start()
+	peer.Start(svr.disableHeartbeat)
 	return nil
 }
 
@@ -363,7 +365,7 @@ func (svr *TLSServer) server_loop() {
 			}
 			svr.Logger.Debug("Server", "Incoming Connection From %s", conn.RemoteAddr())
 			peer := NewConnectingPeer(svr.Logger, svr, conn.(*tls.Conn))
-			peer.Start()
+			peer.Start(svr.disableHeartbeat)
 		}
 	}()
 

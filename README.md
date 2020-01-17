@@ -37,16 +37,17 @@ build/trinity-server --ca cert/ca.pem --cert cert/localhost.pem --loglevel info 
 trinity-server --ca=<CA_PEM> --cert=<CERT_PEM> [other flags]
 ```
 
-| Flag                  | Default   | Description                                                             |
-|:----------------------|-----------|:------------------------------------------------------------------------|
-| -help                 |           | Display command line flags help                                         |
-| -ca             		|           | Specify the Certificate Authority PEM file                              |
-| -cert         		|           | Specify the Certificate PEM file                                        |
-| -loglevel  			| error     | Set the logging level [debug,info,warn,error]                           |
-| -memcache             | false     | Enable the Memcache interface                                           |
-| -memcacheport         | 11211     | Set the port for memcache, default 11211                                |
-| -node                 |           | Specify another Trinity node, i.e. ip_address:port                      |
-| -hostaddr             |           | The hostname and port to advertise to other nodes, i.e. ip_address:port |
+| Flag                  | Default   | Description                                                                                                    |
+|:----------------------|-----------|:---------------------------------------------------------------------------------------------------------------|
+| -help                 |           | Display command line flags help                                                                                |
+| -ca             		|           | Specify the Certificate Authority PEM file                                                                     |
+| -cert         		|           | Specify the Certificate PEM file                                                                               |
+| -loglevel  			| error     | Set the logging level [debug,info,warn,error]                                                                  |
+| -memcache             | false     | Enable the Memcache interface                                                                                  |
+| -memcacheport         | 11211     | Set the port for memcache, default 11211                                                                       |
+| -node                 |           | Specify another Trinity node, i.e. ip_address:port                                                             |
+| -hostaddr             |           | The hostname and port to advertise to other nodes, i.e. ip_address:port                                        |
+| -disable-heartbeat    |           | [DEV ONLY] Disable the heartbeat check so the server isn't disconnected from the network on hitting breakpoint |
 
 ## Documentation
 
